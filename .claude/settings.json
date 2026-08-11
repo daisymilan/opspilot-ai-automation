@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/acer/Documents/**)",
+      "Read(//c/Users/acer/Desktop/**)",
+      "Read(//c/Users/acer/Downloads/**)",
+      "mcp__claude_ai_Google_Drive__search_files",
+      "Bash(npm --version)",
+      "Bash(npx --yes create-next-app@latest . --typescript --tailwind --eslint --app --no-src-dir --import-alias \"@/*\" --use-npm --no-turbopack)",
+      "Bash(cd \"c:\\\\Users\\\\acer\\\\Documents\\\\opspilot-ai-automation\" && mkdir -p components/layout components/ui lib services workflows database tests docs .github/workflows 2>&1 && ls -la)",
+      "Bash(npm install *)",
+      "Bash(git check-ignore *)",
+      "Bash(echo \"exit:$?\")",
+      "Bash(npm run *)",
+      "Bash(ls -la \"c:\\\\Users\\\\acer\" 2>&1 | grep -i \"package-lock\\\\|package.json\" ; echo done)",
+      "Read(//c/Users/acer/**)",
+      "Bash(git add *)"
+    ]
+  }
+}

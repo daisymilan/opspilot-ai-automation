@@ -1,0 +1,14 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env.local
+    restart: unless-stopped
+
+# Additional services (n8n, local Postgres for development, etc.) will be added
+# here once the corresponding phase begins — not included yet since they aren't
+# wired up to anything real.
