@@ -1,10 +1,11 @@
 # tests/
 
-Test suites for OpsPilot, organized by type:
-
-- `tests/unit/` — Vitest unit tests for `lib/` and `services/` logic
-- `tests/integration/` — Vitest tests exercising services against a real (test) Supabase instance
-- `tests/e2e/` — Playwright end-to-end tests against the running app
-
-Test tooling (Vitest, Playwright) will be configured when the first testable
-business logic lands, alongside that code rather than in advance of it.
+- `tests/unit/` — Vitest unit tests for `lib/` and `services/` logic. No
+  external dependencies; run with `npm test`, safe in CI.
+- `tests/integration/` — Vitest tests against a real local Supabase instance
+  (not mocked), exercising actual RLS policies. Run with
+  `npm run test:integration`; requires `npm run db:start` + `npm run db:reset`
+  first (Docker). See [docs/development-setup.md](../docs/development-setup.md#testing).
+- `tests/e2e/` — Playwright end-to-end tests against the running app. Not
+  configured yet — added once there's a UI flow substantial enough to
+  warrant browser-level testing.

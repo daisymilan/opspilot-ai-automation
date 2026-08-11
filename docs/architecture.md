@@ -47,7 +47,9 @@ monitoring, audit logging, and business analytics.
   an API route, or a test.
 - **`app/`** owns presentation and routing: pages read/display state and call `services/`
   for anything domain-specific. No business logic lives in components.
-- **`lib/`** owns generic, domain-agnostic helpers used by both `app/` and `services/`.
+- **`lib/`** owns generic, domain-agnostic helpers used by both `app/` and `services/` —
+  including the Supabase client/server/middleware setup (`lib/supabase/`) and the pure
+  route-protection decision (`lib/auth/route-guard.ts`).
 
 ## The four core workflows (target shape)
 
@@ -98,21 +100,108 @@ through a documented adapter/interface in `services/`, with an explicit, clearly
 development mode when real credentials aren't configured. Integrations are never silently
 faked — a missing integration fails loudly or is visibly stubbed, never presented as real.
 
-## Data model (planned, not yet implemented)
+## Data model
 
-Entities anticipated in `database/`: `users`, `organizations`, `leads`, `lead_scores`,
-`meetings`, `meeting_action_items`, `documents`, `document_extractions`, `approvals`,
-`workflow_executions`, `workflow_errors`, `ai_generations`, `notifications`, `audit_logs`,
-`integrations`. These will be introduced incrementally alongside the workflow that needs
-them, not created wholesale up front.
+`organizations`, `profiles`, `leads`, `workflow_executions`, `approvals`, and `audit_logs`
+exist as of Phase 1 — see [Database architecture](#database-architecture) below. Still
+planned for later phases, introduced alongside the workflow that needs them: `lead_scores`,
+`meetings`, `meeting_action_items`, `documents`, `document_extractions`, `ai_generations`,
+`notifications`, `integrations`.
+
+## Database architecture
+
+Schema lives under [`supabase/migrations/`](../supabase/migrations/), not
+`database/` — the Supabase CLI (`supabase start`, `db reset`, `db push`)
+requires that fixed path to give genuine "reproduce the database from
+scratch" tooling instead of hand-copied SQL. `database/README.md` documents
+the resulting data model; the migrations themselves are the source of truth.
+See [database/README.md](../database/README.md) for the entity list and
+relationships, and [development-setup.md](development-setup.md#database) for
+how to apply them locally.
+
+## Organization / tenant model
+
+OpsPilot is multi-tenant: every user belongs to exactly one `organization`
+via `profiles.organization_id`, and every business record (`leads`,
+`workflow_executions`, `approvals`, `audit_logs`) carries its own
+`organization_id`. Signing up creates a brand-new organization — there is no
+"join an existing org" flow yet (planned for a later phase, once invites
+exist). The first user of an organization is its `owner`.
+
+Organization/profile creation is atomic: the client sends `organization_name`
+and `full_name` as Supabase Auth signup metadata, and a Postgres trigger
+(`handle_new_user`, on `auth.users`) creates both the organization and the
+owner's profile inside the same transaction as the auth user. This avoids a
+partial-failure window where a user exists without an organization or vice
+versa, which two separate client-side inserts could not guarantee.
+
+## RLS strategy
+
+**Row Level Security is the enforcement boundary, not the frontend.** Every
+organization-owned table has RLS enabled, and every policy checks against a
+single function, `current_org_id()` (`SECURITY DEFINER`, resolves
+`auth.uid()` → `profiles.organization_id`), rather than repeating that
+lookup inline per policy.
+
+Two gates apply to every table, and both must agree:
+
+1. **Table-level GRANT** — which roles (`anon` / `authenticated` /
+   `service_role`) may touch the table at all. Recent Supabase projects no
+   longer auto-expose new tables to the Data API, so this is explicit in
+   every migration, not assumed.
+2. **RLS policy** — which _rows_ a role may see/write, once the GRANT
+   already allows the operation.
+
+None of the policies read "authenticated users can access everything."
+Per-table shape:
+
+| Table                 | authenticated may                                       | Notes                                                                                             |
+| --------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `organizations`       | select own org; update own org (owner/admin only)       | insert only via the signup trigger                                                                |
+| `profiles`            | select same-org profiles; update own row only           | `organization_id`/`role` changes blocked by a trigger, independent of RLS                         |
+| `leads`               | full CRUD, own org only                                 | `organization_id` defaults to `current_org_id()`                                                  |
+| `approvals`           | select/insert own org; update (review) owner/admin only | no delete — approvals are a permanent record                                                      |
+| `workflow_executions` | select own org only                                     | insert/update reserved for the service role (system-generated telemetry)                          |
+| `audit_logs`          | select own org only                                     | insert reserved for the service role; **no role** has update/delete — append-only by construction |
+
+## Authentication architecture
+
+Supabase Auth + `@supabase/ssr` for correct Next.js App Router cookie
+handling:
+
+- `lib/supabase/client.ts` — browser client, Client Components only.
+- `lib/supabase/server.ts` — server client, Server Components/Actions/Route
+  Handlers. Created fresh per request from `next/headers` cookies.
+- `proxy.ts` (root, Next.js's post-v16 "proxy" convention — formerly
+  `middleware.ts`) + `lib/supabase/middleware.ts` — refreshes the
+  session cookie on every request and enforces route protection.
+- `lib/auth/route-guard.ts` — the route-protection _decision_ as a pure
+  function (`decideRoute(pathname, isAuthenticated)`), deliberately kept
+  free of Next.js/Supabase so it's unit-testable without a running server or
+  database.
+- `services/auth/actions.ts` — the actual `signUp`/`signIn`/`signOut`
+  Server Actions (Zod-validated input, calls Supabase Auth). UI components
+  (`components/auth/*Form.tsx`) are thin: they call these actions and render
+  the returned error, nothing more.
+
+All three (`anon`, `authenticated`, `service_role`) Supabase API roles are
+real Postgres roles — bypassing the frontend cannot bypass RLS, because RLS
+is evaluated by Postgres itself for every query regardless of which client
+issued it.
 
 ## Phasing
 
-- **Phase 0 (this phase)** — repository, tooling, app shell, documentation. No business
+- **Phase 0** — repository, tooling, app shell, documentation. No business
   logic, no schema, no auth, no integrations.
-- **Later phases** — database schema and Supabase setup, authentication, one core workflow
-  at a time (Lead Intelligence → Meeting Intelligence → Document Intelligence → Reporting),
-  n8n workflow definitions, and the dashboard/analytics views that depend on real execution
-  data.
+- **Phase 1 (this phase)** — Supabase Postgres schema + RLS for the
+  multi-tenant foundation (organizations, profiles, leads,
+  workflow_executions, approvals, audit_logs), Supabase Auth (signup/signin/
+  signout, protected routes), and a minimal Zod-validated lead-creation
+  service to prove the foundation works end to end. No AI, no n8n, no
+  dashboard analytics yet.
+- **Later phases** — one core workflow at a time (Lead Intelligence →
+  Meeting Intelligence → Document Intelligence → Reporting), n8n workflow
+  definitions, and the dashboard/analytics views that depend on real
+  execution data.
 
 Each phase is expected to be verified (tests, build, manual check) before the next begins.
