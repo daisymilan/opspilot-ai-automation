@@ -14,7 +14,8 @@
       "Bash(npm run *)",
       "Bash(ls -la \"c:\\\\Users\\\\acer\" 2>&1 | grep -i \"package-lock\\\\|package.json\" ; echo done)",
       "Read(//c/Users/acer/**)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)"
     ]
   }
 }
