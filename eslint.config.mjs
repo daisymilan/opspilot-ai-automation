@@ -14,6 +14,11 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Runtime artifacts written by the Supabase CLI when the local stack
+    // starts (bundled edge-runtime source, container secrets) — not
+    // project source, already excluded from git via supabase/.gitignore.
+    "supabase/.temp/**",
+    "supabase/.branches/**",
   ]),
 ]);
 
