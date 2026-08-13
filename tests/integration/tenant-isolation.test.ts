@@ -9,41 +9,8 @@
 //
 // Run with `npm run test:integration`. `npm test` does not include this
 // suite, so CI without a local Supabase instance is unaffected.
-import { createClient } from "@supabase/supabase-js";
 import { beforeAll, describe, expect, it } from "vitest";
-import type { Database } from "@/lib/supabase/database.types";
-
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const DEMO_PASSWORD = "DemoPass123!";
-
-function requireLocalSupabase(): { url: string; anonKey: string } {
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    throw new Error(
-      "Integration tests require a running local Supabase instance.\n" +
-        "Run: npm run db:start (requires Docker) && npm run db:reset\n" +
-        "Then set NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY " +
-        "(values are printed by db:start) before running npm run test:integration.",
-    );
-  }
-  return { url: SUPABASE_URL, anonKey: SUPABASE_ANON_KEY };
-}
-
-function anonClient() {
-  const { url, anonKey } = requireLocalSupabase();
-  return createClient<Database>(url, anonKey);
-}
-
-async function signInAs(email: string) {
-  const client = anonClient();
-  const { error } = await client.auth.signInWithPassword({ email, password: DEMO_PASSWORD });
-  if (error) {
-    throw new Error(
-      `Failed to sign in as ${email}: ${error.message}. Did you run \`npm run db:reset\`?`,
-    );
-  }
-  return client;
-}
+import { anonClient, requireLocalSupabase, signInAs } from "./helpers";
 
 beforeAll(() => {
   requireLocalSupabase();

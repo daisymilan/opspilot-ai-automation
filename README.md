@@ -6,11 +6,13 @@ REST APIs/webhooks, AI/LLMs with structured outputs, database automation, human-
 approvals, retries and failure recovery, execution monitoring, audit logging, and business
 analytics.
 
-> **Status: Phase 1 — Database + Authentication.** Multi-tenant Postgres schema with Row
-> Level Security, Supabase Auth (signup/signin/signout, protected routes), and a minimal
-> Zod-validated lead-creation path are in place. AI workflows, n8n orchestration, and
-> dashboard analytics are not yet implemented — see [docs/architecture.md](docs/architecture.md)
-> for the phased plan.
+> **Status: Phase 2 — AI Lead Intelligence.** The first full vertical slice is working
+> end to end: create a lead → n8n orchestrates → Claude analyzes it (real structured
+> output, no fallback) → validated → business rules decide the action → human approval
+> when required → execution and audit trail recorded. See
+> [docs/lead-intelligence.md](docs/lead-intelligence.md) for the full architecture and
+> [docs/architecture.md](docs/architecture.md) for the phased plan. Meeting/document
+> intelligence, reporting, and the full dashboard are not yet implemented.
 
 ## Tech stack
 
@@ -33,16 +35,17 @@ analytics.
 
 ```
 opspilot/
-├── app/          Next.js App Router routes and layouts
+├── app/          Next.js App Router routes, layouts, and API routes (app/api/leads/[id]/analyze)
 ├── components/   UI components (components/ui = presentational primitives)
-├── lib/          Framework-agnostic utilities, incl. lib/supabase (client/server/middleware)
-├── services/     Business logic: auth actions, lead creation, AI adapters (later), approvals
-├── workflows/    n8n workflow definitions and documentation
+├── lib/          Framework-agnostic utilities, incl. lib/supabase (client/server/service-role)
+├── services/     Business logic: auth, leads, AI provider abstraction, business rules, n8n adapter, audit
+├── workflows/    n8n workflow definitions (workflows/lead-intelligence.json)
 ├── supabase/     Migrations + seed data (source of truth for the schema)
 ├── database/     Human-readable data model docs pointing into supabase/
 ├── tests/        Vitest unit + integration suites (Playwright later)
-├── docs/         Architecture and setup documentation
+├── docs/         Architecture, setup, and lead-intelligence documentation
 ├── proxy.ts      Session refresh + route protection (Next.js "proxy" convention)
+├── docker-compose.yml  web + n8n services
 └── public/       Static assets
 ```
 
@@ -51,13 +54,16 @@ See [docs/architecture.md](docs/architecture.md) for the reasoning behind this s
 ## Getting started
 
 See [docs/development-setup.md](docs/development-setup.md) for full setup instructions,
-including the local Supabase stack (requires Docker) and seed login credentials.
+including the local Supabase stack (requires Docker) and seed login credentials. For the
+AI Lead Intelligence flow specifically (n8n + Claude), see
+[docs/lead-intelligence.md](docs/lead-intelligence.md#local-setup).
 
 ```bash
 npm install
 cp .env.example .env.local
 npm run db:start   # local Supabase (Postgres + Auth); requires Docker
 npm run db:reset   # apply migrations + dev seed data; copy printed keys into .env.local
+docker compose up -d n8n   # optional: only needed to trigger real lead analysis
 npm run dev
 ```
 
@@ -94,6 +100,10 @@ in with a [seed account](docs/development-setup.md#database).
    adapter/interface and an explicit development mode.
 7. Business logic stays out of the UI layer.
 8. n8n owns orchestration and third-party integration; the TypeScript app owns business logic.
+9. The AI provider is an injectable interface (`services/ai/types.ts`), not a hardcoded
+   SDK call — tests use a `DeterministicTestProvider` that is never called "AI" in
+   production and can never be mistaken for a real result (see
+   [docs/lead-intelligence.md](docs/lead-intelligence.md#ai-architecture)).
 
 ## License
 

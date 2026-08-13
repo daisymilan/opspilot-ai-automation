@@ -1,13 +1,11 @@
 # workflows/
 
-n8n is responsible for orchestration and third-party integrations (webhooks,
-retries, scheduling, cross-system calls). This directory holds:
+n8n is responsible for orchestration and third-party integrations (webhooks, retries,
+scheduling, cross-system calls). n8n workflows call into the application's `services/`
+layer (via API routes) for business logic — they do not reimplement business rules
+themselves.
 
-- Exported n8n workflow JSON definitions, version-controlled
-- Workflow-level documentation (trigger, steps, expected inputs/outputs)
-- Any local tooling for importing/exporting workflows to/from an n8n instance
-
-n8n workflows call into the application's `services/` layer (via API routes)
-for business logic — they should not reimplement business rules themselves.
-
-Nothing here yet — populated starting the workflow-orchestration phase.
+- `lead-intelligence.json` — the AI Lead Intelligence workflow (Phase 2). Real, exported
+  n8n workflow JSON, validated by importing it into a running local n8n instance. See
+  [docs/lead-intelligence.md](../docs/lead-intelligence.md) for the architecture, the
+  node-by-node breakdown, and exactly how to import and run it locally.

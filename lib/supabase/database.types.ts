@@ -57,6 +57,7 @@ export interface Database {
           name: string;
           email: string | null;
           company: string | null;
+          message: string | null;
           source: "manual" | "webhook" | "api" | "import";
           status: "new" | "contacted" | "qualified" | "disqualified" | "converted";
           owner_id: string | null;
@@ -69,6 +70,7 @@ export interface Database {
           name: string;
           email?: string | null;
           company?: string | null;
+          message?: string | null;
           source?: "manual" | "webhook" | "api" | "import";
           status?: "new" | "contacted" | "qualified" | "disqualified" | "converted";
           owner_id?: string | null;
@@ -85,7 +87,7 @@ export interface Database {
           workflow_name: string;
           entity_type: string | null;
           entity_id: string | null;
-          status: "pending" | "running" | "succeeded" | "failed" | "retrying";
+          status: "pending" | "running" | "succeeded" | "failed" | "retrying" | "waiting_approval";
           started_at: string;
           completed_at: string | null;
           duration_ms: number | null;
@@ -99,7 +101,7 @@ export interface Database {
           workflow_name: string;
           entity_type?: string | null;
           entity_id?: string | null;
-          status?: "pending" | "running" | "succeeded" | "failed" | "retrying";
+          status?: "pending" | "running" | "succeeded" | "failed" | "retrying" | "waiting_approval";
           started_at?: string;
           completed_at?: string | null;
           duration_ms?: number | null;
@@ -161,6 +163,42 @@ export interface Database {
           entity_type?: string | null;
           entity_id?: string | null;
           metadata?: Record<string, unknown>;
+          created_at?: string;
+        };
+        Update: never;
+        Relationships: [];
+      };
+      lead_scores: {
+        Row: {
+          id: string;
+          lead_id: string;
+          organization_id: string;
+          score: number;
+          priority: "low" | "medium" | "high";
+          intent: string;
+          industry: string | null;
+          confidence: number;
+          recommended_action:
+            "schedule_call" | "send_follow_up" | "assign_sales_owner" | "manual_review";
+          reasoning_summary: string;
+          model: string;
+          prompt_version: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          lead_id: string;
+          organization_id?: string;
+          score: number;
+          priority: "low" | "medium" | "high";
+          intent: string;
+          industry?: string | null;
+          confidence: number;
+          recommended_action:
+            "schedule_call" | "send_follow_up" | "assign_sales_owner" | "manual_review";
+          reasoning_summary: string;
+          model: string;
+          prompt_version: string;
           created_at?: string;
         };
         Update: never;

@@ -9,6 +9,39 @@ services:
       - .env.local
     restart: unless-stopped
 
-# Additional services (n8n, local Postgres for development, etc.) will be added
-# here once the corresponding phase begins — not included yet since they aren't
-# wired up to anything real.
+  # n8n: workflow orchestration for the Phase 2 lead-intelligence pipeline
+  # (see workflows/lead-intelligence.json and docs/lead-intelligence.md).
+  # Official image used directly — this is off-the-shelf infrastructure,
+  # not application code, so it doesn't go through our own Dockerfile.
+  #
+  # Required env vars (see .env.example): N8N_ENCRYPTION_KEY,
+  # N8N_WEBHOOK_SECRET, APP_BASE_URL (how n8n reaches the Next.js app —
+  # defaults to Docker Desktop's host gateway since the app runs via
+  # `npm run dev` on the host, not in Docker, during local development).
+  # All read from .env.local via env_file below — never hardcoded here,
+  # never committed.
+  #
+  # Runs alongside local Supabase without conflict: Supabase occupies
+  # 54321-54329; n8n uses 5678 only.
+  n8n:
+    image: n8nio/n8n:1.72.1
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    env_file:
+      - .env.local
+    environment:
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - GENERIC_TIMEZONE=UTC
+    volumes:
+      - n8n_data:/home/node/.n8n
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:5678/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  n8n_data:
+    name: opspilot_n8n_data

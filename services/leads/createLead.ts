@@ -28,6 +28,7 @@ export async function createLead(
       name: parsed.data.name,
       email: parsed.data.email ?? null,
       company: parsed.data.company ?? null,
+      message: parsed.data.message ?? null,
       source: parsed.data.source,
     })
     .select()

@@ -40,6 +40,16 @@ describe("decideRoute", () => {
   it("allows an authenticated user to view the marketing home page", () => {
     expect(decideRoute("/", true)).toBe("allow");
   });
+
+  it("never redirects API routes to login, authenticated or not", () => {
+    // Regression test: a real end-to-end n8n webhook call was previously
+    // silently redirected to an HTML /login page (200, not JSON) because
+    // this case wasn't excluded — n8n has no session cookie and treated
+    // the redirect response as an invalid AI pipeline response.
+    expect(decideRoute("/api/leads/123/analyze", false)).toBe("allow");
+    expect(decideRoute("/api/leads/123/analyze", true)).toBe("allow");
+    expect(decideRoute("/api", false)).toBe("allow");
+  });
 });
 
 describe("safeRedirectPath", () => {

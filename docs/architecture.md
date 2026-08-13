@@ -31,8 +31,9 @@ monitoring, audit logging, and business analytics.
                         ▼                                ▼
               ┌───────────────────┐          ┌───────────────────────┐
               │ Supabase Postgres  │          │  AI providers          │
-              │ (+ Auth)           │          │  Claude (primary)      │
-              │                    │          │  OpenAI (fallback)     │
+              │ (+ Auth)           │          │  Claude (implemented)  │
+              │                    │          │  OpenAI (reserved,     │
+              │                    │          │  not implemented)      │
               └───────────────────┘          └───────────────────────┘
 ```
 
@@ -51,14 +52,16 @@ monitoring, audit logging, and business analytics.
   including the Supabase client/server/middleware setup (`lib/supabase/`) and the pure
   route-protection decision (`lib/auth/route-guard.ts`).
 
-## The four core workflows (target shape)
+## The four core workflows
 
-Each of these will be implemented incrementally, workflow by workflow, in later phases —
-not built simultaneously.
+Each of these is implemented incrementally, workflow by workflow — not built
+simultaneously.
 
-1. **AI Lead Intelligence** — Lead Created → Validate → Normalize → Duplicate Check →
-   AI Classification → Lead Scoring → Recommended Action → Database → Assignment →
-   Follow-up Draft → Human Approval (when required) → Execute Action → Audit Log
+1. **AI Lead Intelligence** — **implemented, Phase 2.** Lead Created → Persist →
+   Trigger n8n → Validate → Duplicate/Idempotency Check → AI Analyze → Validate
+   Structured Output → Business Rules → Recommended Action → Human Approval (when
+   required) → Execution + Audit Log. See [lead-intelligence.md](lead-intelligence.md)
+   for the full architecture, sequence diagram, and security model.
 2. **AI Meeting Intelligence** — Meeting/transcript → AI Summary → Extract Action Items →
    Identify Owners → Identify Dates → Generate Follow-up Draft → Human Review → Approval →
    Action → Audit Log
@@ -102,11 +105,10 @@ faked — a missing integration fails loudly or is visibly stubbed, never presen
 
 ## Data model
 
-`organizations`, `profiles`, `leads`, `workflow_executions`, `approvals`, and `audit_logs`
-exist as of Phase 1 — see [Database architecture](#database-architecture) below. Still
-planned for later phases, introduced alongside the workflow that needs them: `lead_scores`,
-`meetings`, `meeting_action_items`, `documents`, `document_extractions`, `ai_generations`,
-`notifications`, `integrations`.
+`organizations`, `profiles`, `leads` (Phase 1), plus `lead_scores` (Phase 2) exist — see
+[Database architecture](#database-architecture) below. Still planned for later phases,
+introduced alongside the workflow that needs them: `meetings`, `meeting_action_items`,
+`documents`, `document_extractions`, `ai_generations`, `notifications`, `integrations`.
 
 ## Database architecture
 
@@ -162,6 +164,7 @@ Per-table shape:
 | `leads`               | full CRUD, own org only                                 | `organization_id` defaults to `current_org_id()`                                                  |
 | `approvals`           | select/insert own org; update (review) owner/admin only | no delete — approvals are a permanent record                                                      |
 | `workflow_executions` | select own org only                                     | insert/update reserved for the service role (system-generated telemetry)                          |
+| `lead_scores`         | select own org only                                     | insert/update reserved for the service role — AI-generated data isn't client-writable             |
 | `audit_logs`          | select own org only                                     | insert reserved for the service role; **no role** has update/delete — append-only by construction |
 
 ## Authentication architecture
@@ -193,15 +196,18 @@ issued it.
 
 - **Phase 0** — repository, tooling, app shell, documentation. No business
   logic, no schema, no auth, no integrations.
-- **Phase 1 (this phase)** — Supabase Postgres schema + RLS for the
-  multi-tenant foundation (organizations, profiles, leads,
-  workflow_executions, approvals, audit_logs), Supabase Auth (signup/signin/
-  signout, protected routes), and a minimal Zod-validated lead-creation
-  service to prove the foundation works end to end. No AI, no n8n, no
-  dashboard analytics yet.
-- **Later phases** — one core workflow at a time (Lead Intelligence →
-  Meeting Intelligence → Document Intelligence → Reporting), n8n workflow
-  definitions, and the dashboard/analytics views that depend on real
+- **Phase 1** — Supabase Postgres schema + RLS for the multi-tenant
+  foundation (organizations, profiles, leads, workflow_executions,
+  approvals, audit_logs), Supabase Auth (signup/signin/signout, protected
+  routes), and a minimal Zod-validated lead-creation service. No AI, no
+  n8n, no dashboard analytics yet.
+- **Phase 2 (this phase)** — AI Lead Intelligence, the first full vertical
+  slice: `lead_scores` table + RLS, a real Claude integration behind a
+  provider-agnostic interface, n8n orchestration (`workflows/lead-intelligence.json`),
+  business rules gating human approval, and a working `/leads` UI. See
+  [lead-intelligence.md](lead-intelligence.md).
+- **Later phases** — Meeting Intelligence → Document Intelligence →
+  Reporting, and the dashboard/analytics views that depend on accumulated
   execution data.
 
 Each phase is expected to be verified (tests, build, manual check) before the next begins.

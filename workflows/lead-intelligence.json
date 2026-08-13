@@ -1,0 +1,140 @@
+[
+  {
+    "name": "OpsPilot - Lead Intelligence",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "lead-intelligence",
+          "authentication": "headerAuth",
+          "responseMode": "responseNode",
+          "options": {}
+        },
+        "id": "c713b953-64bb-4ba5-8c86-2166639aa308",
+        "name": "01 Receive Lead",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [240, 300],
+        "webhookId": "opspilot-lead-intelligence",
+        "notes": "Triggered by services/n8n/triggerWorkflow.ts after a lead is created. Authenticated via a Header Auth credential (see docs/lead-intelligence.md) — set this up manually after import, it is never stored in this JSON.",
+        "credentials": {
+          "httpHeaderAuth": {
+            "id": "opspilot-webhook-secret",
+            "name": "OpsPilot Webhook Secret"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict"
+            },
+            "combinator": "and",
+            "conditions": [
+              {
+                "id": "has-lead-id",
+                "leftValue": "={{ $json.body.leadId }}",
+                "rightValue": "",
+                "operator": { "type": "string", "operation": "notEmpty", "singleValue": true }
+              },
+              {
+                "id": "has-execution-id",
+                "leftValue": "={{ $json.body.executionId }}",
+                "rightValue": "",
+                "operator": { "type": "string", "operation": "notEmpty", "singleValue": true }
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "96047469-a008-48a1-b0cd-27c90cd97481",
+        "name": "02 Validate Input",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [460, 300],
+        "notes": "Payload-shape validation only (leadId/executionId present) — the lead itself was already validated with Zod when it was created. This just guards against a malformed or malicious webhook call."
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "={{ $env.APP_BASE_URL + '/api/leads/' + $json.body.leadId + '/analyze' }}",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              { "name": "Content-Type", "value": "application/json" },
+              { "name": "X-Webhook-Secret", "value": "={{ $env.N8N_WEBHOOK_SECRET }}" }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{ JSON.stringify({ executionId: $json.body.executionId }) }}",
+          "options": {
+            "timeout": 35000,
+            "response": {
+              "response": {
+                "neverError": true,
+                "responseFormat": "json"
+              }
+            }
+          }
+        },
+        "id": "6c8f972e-368a-43ef-b126-e17ae4a55ece",
+        "name": "03 Analyze Lead",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [680, 220],
+        "notes": "The entire business-logic pipeline runs server-side inside this one call — duplicate/idempotency check, Claude call, Zod validation of the AI output, business rules, persisting lead_scores, creating an approval if required, updating the execution record, and writing audit log entries. See services/leads/analyzeLeadPipeline.ts. n8n does not reimplement any of this; it only orchestrates around it. 'neverError' is on so this node's output (success or failure) can be forwarded to the caller instead of halting the workflow."
+      },
+      {
+        "parameters": {
+          "respondWith": "json",
+          "responseBody": "={{ $json }}",
+          "options": {
+            "responseCode": "={{ $json.success ? 200 : 422 }}"
+          }
+        },
+        "id": "ca3029f5-356e-4ce0-af31-0e2e6d526505",
+        "name": "04 Respond With Result",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.2,
+        "position": [900, 220],
+        "notes": "Forwards the analyze endpoint's own response (success/failure, leadScoreId, requiresApproval, recommendedAction, or error) straight back to the caller — the createLeadAndAnalyze() server action awaits this to show the result in the UI immediately."
+      },
+      {
+        "parameters": {
+          "respondWith": "json",
+          "responseBody": "={{ { success: false, error: 'leadId and executionId are required' } }}",
+          "options": { "responseCode": 400 }
+        },
+        "id": "79424ddb-c609-4b89-8ac9-cef717b6a25d",
+        "name": "05 Respond Invalid Request",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1.2,
+        "position": [680, 420]
+      }
+    ],
+    "connections": {
+      "01 Receive Lead": {
+        "main": [[{ "node": "02 Validate Input", "type": "main", "index": 0 }]]
+      },
+      "02 Validate Input": {
+        "main": [
+          [{ "node": "03 Analyze Lead", "type": "main", "index": 0 }],
+          [{ "node": "05 Respond Invalid Request", "type": "main", "index": 0 }]
+        ]
+      },
+      "03 Analyze Lead": {
+        "main": [[{ "node": "04 Respond With Result", "type": "main", "index": 0 }]]
+      }
+    },
+    "active": false,
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "id": "opspilot-lead-intelligence",
+    "tags": []
+  }
+]

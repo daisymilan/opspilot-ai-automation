@@ -1,16 +1,17 @@
 # services/
 
-Application/business-logic layer. This is where domain rules live, kept
-separate from both the UI (`app/`, `components/`) and orchestration (`workflows/`):
+Application/business-logic layer, kept separate from both the UI (`app/`, `components/`)
+and orchestration (`workflows/`):
 
-- AI provider adapters (Claude primary, OpenAI fallback) behind a stable interface
-- Structured-output validation (Zod schemas) for every LLM response
-- Lead scoring, classification, and business-rule evaluation
-- Database access (Supabase client wrappers, repository-style functions)
-- Approval, audit-logging, and execution-tracking logic
+- `services/auth/` — signup/signin/signout Server Actions, current-profile resolution
+- `services/leads/` — lead intake, the create-lead-and-trigger-analysis orchestration,
+  the lead-intelligence pipeline, and business rules
+- `services/ai/` — provider-agnostic AI interface, the real Claude provider, and a
+  deterministic test provider (never used in production)
+- `services/n8n/` — the webhook adapter that triggers n8n workflows
+- `services/audit/` — the single write path for `audit_logs`
 
-Each external integration should be a documented adapter/interface with an
-explicit development mode — never a hard-coded fake response pretending to be
-a real integration.
-
-Nothing here yet — populated starting Phase 1.
+Each external integration (Claude, n8n) is a documented adapter/interface with an
+explicit failure mode when unconfigured — never a hard-coded fake response pretending to
+be a real integration. See [docs/lead-intelligence.md](../docs/lead-intelligence.md) for
+the full lead-intelligence architecture.

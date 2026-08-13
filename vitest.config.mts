@@ -1,3 +1,4 @@
+import path from "node:path";
 import { loadEnv } from "vite";
 import { defineConfig } from "vitest/config";
 
@@ -11,6 +12,16 @@ const env = loadEnv("", process.cwd(), "");
 export default defineConfig({
   resolve: {
     tsconfigPaths: true,
+    alias: {
+      // The `server-only` package throws unless the bundler sets Next.js's
+      // "react-server" export condition — correct in Next's own build (it's
+      // what stops server-only code from reaching the browser), but Vitest
+      // isn't that bundler, so testing server-only modules directly under
+      // Node (a legitimate server context) would otherwise always crash.
+      // Point it at the package's own empty "react-server" build instead of
+      // loosening the guard itself.
+      "server-only": path.resolve(process.cwd(), "node_modules/server-only/empty.js"),
+    },
   },
   test: {
     env,

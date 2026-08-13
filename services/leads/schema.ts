@@ -17,6 +17,13 @@ export const createLeadSchema = z.object({
     .optional()
     .or(z.literal(""))
     .transform((value) => (value === "" ? undefined : value)),
+  message: z
+    .string()
+    .trim()
+    .max(2000, "Message must be 2000 characters or fewer")
+    .optional()
+    .or(z.literal(""))
+    .transform((value) => (value === "" ? undefined : value)),
   source: z.enum(["manual", "webhook", "api", "import"]).default("manual"),
 });
 
