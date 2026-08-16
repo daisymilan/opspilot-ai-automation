@@ -6,13 +6,17 @@ REST APIs/webhooks, AI/LLMs with structured outputs, database automation, human-
 approvals, retries and failure recovery, execution monitoring, audit logging, and business
 analytics.
 
-> **Status: Phase 2 — AI Lead Intelligence.** The first full vertical slice is working
-> end to end: create a lead → n8n orchestrates → Claude analyzes it (real structured
-> output, no fallback) → validated → business rules decide the action → human approval
-> when required → execution and audit trail recorded. See
-> [docs/lead-intelligence.md](docs/lead-intelligence.md) for the full architecture and
+> **Status: Phase 3 — Operations & Human Approval Center.** The first full vertical slice
+> (AI Lead Intelligence) works end to end: create a lead → n8n orchestrates → Claude
+> analyzes it (real structured output, no fallback) → validated → business rules decide
+> the action → human approval when required → execution and audit trail recorded. Phase 3
+> adds a real operations UI on top of that: a Dashboard with genuine execution
+> metrics and service health, an Approval Center with a database-enforced (not just
+> UI-hidden) reviewer boundary, and an Execution Explorer with a real timeline built from
+> audit events. See [docs/operations-center.md](docs/operations-center.md) and
+> [docs/lead-intelligence.md](docs/lead-intelligence.md) for the full architecture, and
 > [docs/architecture.md](docs/architecture.md) for the phased plan. Meeting/document
-> intelligence, reporting, and the full dashboard are not yet implemented.
+> intelligence and reporting are not yet implemented.
 
 ## Tech stack
 
@@ -56,7 +60,9 @@ See [docs/architecture.md](docs/architecture.md) for the reasoning behind this s
 See [docs/development-setup.md](docs/development-setup.md) for full setup instructions,
 including the local Supabase stack (requires Docker) and seed login credentials. For the
 AI Lead Intelligence flow specifically (n8n + Claude), see
-[docs/lead-intelligence.md](docs/lead-intelligence.md#local-setup).
+[docs/lead-intelligence.md](docs/lead-intelligence.md#local-setup). For the
+Dashboard/Approvals/Executions UI, see
+[docs/operations-center.md](docs/operations-center.md).
 
 ```bash
 npm install

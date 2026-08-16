@@ -57,6 +57,18 @@ export async function runLeadAnalysisPipeline({
         duration_ms: Date.now() - new Date(execution.started_at).getTime(),
       })
       .eq("id", executionId);
+
+    // Only the success paths were audited before this — every failure
+    // reason now has a real, timestamped record too (see
+    // docs/operations-center.md's execution timeline, which reads this).
+    await recordAuditEvent(supabase, {
+      organizationId: execution.organization_id,
+      action: "lead_intelligence.failed",
+      entityType: "lead",
+      entityId: leadId,
+      metadata: { executionId, error: message },
+    });
+
     return { success: false, error: message };
   };
 

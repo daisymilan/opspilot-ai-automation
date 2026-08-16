@@ -77,12 +77,15 @@ begin
   );
 
   -- The trigger always creates a brand-new org per signup (that's the real
-  -- product behavior); move this second demo user into Acme Ops so the
-  -- seed data demonstrates multiple members in one organization, then
-  -- drop the throwaway placeholder org the trigger created for them.
-  -- profiles_protect_fields normally blocks changing organization_id via
-  -- UPDATE (by design, see 20260811133605_org_membership_functions.sql) —
-  -- disabled here for this one seed-only reassignment, then re-enabled
+  -- product behavior) and always makes that signup its org's 'owner' (see
+  -- handle_new_user()); move this second demo user into Acme Ops as a
+  -- genuine non-owner 'member' — matching what docs/development-setup.md
+  -- has always documented for this account — so the seed data actually
+  -- has a real member-role fixture for authorization tests, then drop the
+  -- throwaway placeholder org the trigger created for them.
+  -- profiles_protect_fields normally blocks changing organization_id/role
+  -- via UPDATE (by design, see 20260811133605_org_membership_functions.sql)
+  -- — disabled here for this one seed-only reassignment, then re-enabled
   -- immediately after.
   select organization_id into v_acme_member_throwaway_org_id
   from public.profiles where id = v_acme_member_id;
@@ -90,7 +93,7 @@ begin
   alter table public.profiles disable trigger profiles_protect_fields;
 
   update public.profiles
-  set organization_id = v_acme_org_id
+  set organization_id = v_acme_org_id, role = 'member'
   where id = v_acme_member_id;
 
   alter table public.profiles enable trigger profiles_protect_fields;

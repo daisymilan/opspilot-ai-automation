@@ -61,7 +61,9 @@ simultaneously.
    Trigger n8n → Validate → Duplicate/Idempotency Check → AI Analyze → Validate
    Structured Output → Business Rules → Recommended Action → Human Approval (when
    required) → Execution + Audit Log. See [lead-intelligence.md](lead-intelligence.md)
-   for the full architecture, sequence diagram, and security model.
+   for the full architecture, sequence diagram, and security model. The human-approval
+   step and execution history are now reviewable from a real UI (Dashboard, Approval
+   Center, Execution Explorer) — see [operations-center.md](operations-center.md).
 2. **AI Meeting Intelligence** — Meeting/transcript → AI Summary → Extract Action Items →
    Identify Owners → Identify Dates → Generate Follow-up Draft → Human Review → Approval →
    Action → Audit Log
@@ -88,7 +90,8 @@ and the decision itself is logged.
 
 Every meaningful automation execution is recorded with: workflow name, entity, status,
 start time, completion time, duration, retry count, error (if any), and relevant metadata.
-This is what powers the Executions and Dashboard pages later.
+This powers the real Dashboard, Approval Center, and Execution Explorer pages — see
+[operations-center.md](operations-center.md).
 
 ## Failure handling
 
@@ -201,13 +204,17 @@ issued it.
   approvals, audit_logs), Supabase Auth (signup/signin/signout, protected
   routes), and a minimal Zod-validated lead-creation service. No AI, no
   n8n, no dashboard analytics yet.
-- **Phase 2 (this phase)** — AI Lead Intelligence, the first full vertical
+- **Phase 2** — AI Lead Intelligence, the first full vertical
   slice: `lead_scores` table + RLS, a real Claude integration behind a
   provider-agnostic interface, n8n orchestration (`workflows/lead-intelligence.json`),
   business rules gating human approval, and a working `/leads` UI. See
   [lead-intelligence.md](lead-intelligence.md).
-- **Later phases** — Meeting Intelligence → Document Intelligence →
-  Reporting, and the dashboard/analytics views that depend on accumulated
-  execution data.
+- **Phase 3 (this phase)** — Operations & Human Approval Center: a real Dashboard,
+  Approval Center, and Execution Explorer built entirely on Phase 1/2 data — no new
+  tables or migrations. Approve/reject with a database-enforced (not just
+  application-enforced) reviewer boundary, a safe-by-construction retry, and an
+  execution timeline built only from real audit events. See
+  [operations-center.md](operations-center.md).
+- **Later phases** — Meeting Intelligence → Document Intelligence → Reporting.
 
 Each phase is expected to be verified (tests, build, manual check) before the next begins.
