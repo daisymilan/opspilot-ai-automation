@@ -1,5 +1,12 @@
 # Development Setup
 
+> This document covers **local development only** — local Supabase (Docker)
+> and local n8n (Docker), the primary environment for building and testing
+> this project. For deploying to Vercel + Supabase Cloud + production n8n,
+> see [production-deployment.md](production-deployment.md). The two never
+> overlap: local dev must never point at the hosted Supabase project (see
+> [production-deployment.md#local-vs-production](production-deployment.md#local-vs-production)).
+
 ## Prerequisites
 
 - Node.js 20+ (repo was built and verified against Node 22)

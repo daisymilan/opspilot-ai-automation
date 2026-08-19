@@ -209,12 +209,18 @@ issued it.
   provider-agnostic interface, n8n orchestration (`workflows/lead-intelligence.json`),
   business rules gating human approval, and a working `/leads` UI. See
   [lead-intelligence.md](lead-intelligence.md).
-- **Phase 3 (this phase)** — Operations & Human Approval Center: a real Dashboard,
+- **Phase 3** — Operations & Human Approval Center: a real Dashboard,
   Approval Center, and Execution Explorer built entirely on Phase 1/2 data — no new
   tables or migrations. Approve/reject with a database-enforced (not just
   application-enforced) reviewer boundary, a safe-by-construction retry, and an
   execution timeline built only from real audit events. See
   [operations-center.md](operations-center.md).
+- **Phase 4 (this phase)** — Productionization: the same application deployed
+  for real — GitHub → Vercel → Supabase Cloud → production n8n → Claude API.
+  No new application features and no architecture changes; this phase is
+  entirely about environment separation, hosted-database migration
+  deployment, production auth/webhook configuration, and honest production
+  verification. See [production-deployment.md](production-deployment.md).
 - **Later phases** — Meeting Intelligence → Document Intelligence → Reporting.
 
 Each phase is expected to be verified (tests, build, manual check) before the next begins.

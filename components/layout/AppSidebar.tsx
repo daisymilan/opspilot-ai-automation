@@ -8,11 +8,11 @@ export function AppSidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="w-56 shrink-0 border-r border-black/10 dark:border-white/10 p-4">
-      <Link href="/" className="block text-lg font-semibold mb-6">
+    <aside className="w-full sm:w-56 sm:shrink-0 border-b sm:border-b-0 sm:border-r border-black/10 dark:border-white/10 p-4">
+      <Link href="/" className="hidden sm:block text-lg font-semibold mb-6">
         OpsPilot
       </Link>
-      <nav className="flex flex-col gap-1">
+      <nav className="flex flex-row flex-wrap sm:flex-col gap-1">
         {NAV_ITEMS.map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
           return (
