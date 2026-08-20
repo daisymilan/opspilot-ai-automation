@@ -51,6 +51,17 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
     .limit(1);
   const approval = approvals?.[0] ?? null;
 
+  // approval === null is ambiguous on its own — it's equally true when the
+  // AI succeeded and decided no approval was needed, and when analysis
+  // never completed (failed, or hasn't run yet). Only the execution's real
+  // status can distinguish which one actually happened here.
+  const approvalFallbackMessage =
+    execution?.status === "succeeded"
+      ? "No approval required — the recommended action was low-risk and high-confidence."
+      : execution?.status === "failed"
+        ? "Approval decision unavailable — the AI analysis failed. See execution status above."
+        : "No approval decision yet — analysis has not completed.";
+
   return (
     <div className="flex flex-col gap-8 max-w-2xl">
       <div>
@@ -138,9 +149,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
             ) : null}
           </div>
         ) : (
-          <p className="text-sm text-black/50 dark:text-white/50">
-            No approval required — the recommended action was low-risk and high-confidence.
-          </p>
+          <p className="text-sm text-black/50 dark:text-white/50">{approvalFallbackMessage}</p>
         )}
       </section>
     </div>
