@@ -8,11 +8,14 @@ multi-tenant Postgres schema with real Row Level Security, and full execution/au
 observability.
 
 **GitHub**: [github.com/daisymilan/opspilot-ai-automation](https://github.com/daisymilan/opspilot-ai-automation)
-**Live demo**: not yet deployed — Phase 4 (productionization) is in progress. This
-section will be updated with a real URL once Vercel + Supabase Cloud + production n8n
-are live and verified; see [docs/production-deployment.md](docs/production-deployment.md)
-for the deployment plan and current status. No demo link is published until it has
-actually been tested end to end.
+**Live demo**: [opspilot-ai-automation.vercel.app](https://opspilot-ai-automation.vercel.app)
+— deployed and reachable (Vercel + Supabase Cloud + n8n Cloud). This confirms the app
+itself, not a fully working AI pipeline end to end: AI lead-analysis is currently
+degraded by an unresolved Anthropic billing issue, so a real lead's analysis will
+presently fail with a genuine billing error rather than complete — see
+[Known limitations](#known-limitations). See
+[docs/production-deployment.md](docs/production-deployment.md) for the full deployment
+status, including what has and hasn't been independently verified.
 
 ## Why this project exists
 

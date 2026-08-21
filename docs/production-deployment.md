@@ -5,6 +5,46 @@ n8n) to a real production deployment: GitHub → Vercel → Supabase Cloud →
 production n8n → Claude API. Local development is unaffected by any of this —
 see [Local vs. production](#local-vs-production).
 
+## Current status
+
+Confirmed against the real hosted project/deployment, not assumed:
+
+- **Vercel**: deployed and reachable at
+  [opspilot-ai-automation.vercel.app](https://opspilot-ai-automation.vercel.app) —
+  homepage, `/login`, and `/signup` return 200; `/dashboard` correctly redirects an
+  unauthenticated request to `/login` (verified directly via HTTP checks against the
+  live URL).
+- **Supabase Cloud**: linked, all 14 local migrations pushed and confirmed matching
+  remote (`supabase migration list`). Schema, RLS (enabled on all 7 tables), policies,
+  functions/triggers (including the `auth.users` signup trigger), constraints, and
+  indexes were all directly verified via read-only queries against the hosted
+  database. `supabase/seed.sql` was confirmed **not** applied — production started
+  with zero rows.
+- **n8n**: **n8n Cloud** is the actual production host — not the Railway
+  recommendation below, which predates that decision. The
+  `workflows/lead-intelligence.json` workflow is imported, active, and its
+  production webhook has been exercised for real.
+- **End-to-end pipeline, exercised for real**: a lead created in production produced
+  a real `workflow_executions` row, was picked up by the n8n Cloud webhook, called
+  `/api/leads/:id/analyze` in production, and reached the real Anthropic API —
+  confirmed by directly reading the resulting `workflow_executions`/`audit_logs` rows
+  on the hosted database (not taken on faith).
+- **Anthropic billing — still NOT resolved.** That real Claude call failed with a
+  genuine `invalid_request_error` (insufficient account credit) — the same limitation
+  described in the [README's Known limitations](../README.md#known-limitations)
+  section. This deployment does **not** fix it. A successful real end-to-end AI
+  analysis in production has not been demonstrated.
+- **Not yet independently verified**: the production Supabase Auth settings
+  described below (Site URL, redirect URLs, email-confirmation toggle) have not been
+  confirmed as actually applied in the hosted project's dashboard; the
+  two-organization RLS cross-tenant test in
+  [Production verification procedure](#production-verification-procedure) has been
+  proven locally (`tests/integration/`) but not yet re-run against the hosted
+  database directly; and a full authenticated walkthrough (sign up → sign in →
+  view the dashboard as a real logged-in user) has not been performed against the
+  live deployment by anything in this repository — only route-level reachability has
+  been checked.
+
 ## Architecture
 
 ```
@@ -38,8 +78,12 @@ same `ClaudeProvider`. Only _where_ each piece runs changes.
 
 ## Supabase Cloud setup
 
-The hosted project already exists (created by the project owner) and is
-brand new — no application schema yet.
+> **Status: done.** See [Current status](#current-status) above — the steps below
+> are kept as the reproducible procedure, not a pending task list.
+
+The hosted project was created by the project owner as a brand-new project with no
+application schema; the steps below are what was actually run to bring it to its
+current, verified state.
 
 ### Link the CLI
 
@@ -136,6 +180,12 @@ flows at the right URL and preserves today's tested signup behavior.
 
 ## Production n8n
 
+> **Status: done — n8n Cloud is the actual production host.** The
+> recommendation and alternatives below reflect the reasoning at the time this
+> section was written, before that decision was made; n8n Cloud, not Railway, is
+> what was ultimately deployed and is currently live. Kept here for the reasoning,
+> not as an open decision.
+
 Vercel cannot host n8n — it's a long-running, stateful service (holds
 encrypted credentials on disk), not a serverless function. It needs its own
 host, reachable over HTTPS by both the Vercel app (to trigger the workflow)
@@ -170,8 +220,8 @@ already pinned in `docker-compose.yml`, with a persistent volume for
   separate product/subscription from self-hosting, and doesn't reuse the
   pinned Docker image/version already validated locally.
 
-Whichever is chosen, this step needs your account/billing decision — I
-cannot provision hosting without credentials.
+This decision has been made (n8n Cloud) and is live — see
+[Current status](#current-status).
 
 ### Required n8n environment variables
 
@@ -224,6 +274,11 @@ local, it's a workflow path, not an environment-specific value).
   during this phase's code review, not something Phase 4 needed to add.
 
 ## Vercel deployment
+
+> **Status: done.** Live at
+> [opspilot-ai-automation.vercel.app](https://opspilot-ai-automation.vercel.app) —
+> see [Current status](#current-status). The steps below are the reproducible
+> setup procedure, not a pending task list.
 
 The project is Vercel-compatible with no framework-specific changes needed:
 
@@ -408,6 +463,13 @@ dev/test-only, per this phase's constraints) and is never run automatically
 by any deploy step.
 
 ## Production verification procedure
+
+> **Status: not yet done against the hosted database.** This exact test is proven
+> locally (`tests/integration/tenant-isolation.test.ts`,
+> `tests/integration/operations-center.test.ts`) but has not yet been re-run
+> against the hosted Supabase project directly — see
+> [Current status](#current-status). Anthropic API success in production
+> specifically remains unverified and unresolved (billing) — do not treat it as done.
 
 After deployment, verify against the **real hosted Supabase project**,
 through the **authenticated/anon-key path** — never the service role key,
