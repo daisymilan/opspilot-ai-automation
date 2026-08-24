@@ -4,7 +4,7 @@ export default function Home() {
   return (
     <main className="flex flex-1 flex-col items-center justify-center gap-6 px-6 text-center">
       <span className="rounded-full border border-black/10 dark:border-white/10 px-3 py-1 text-xs text-black/50 dark:text-white/50">
-        Phase 0 — Foundation
+        Live demo — AI lead triage with human approval
       </span>
       <h1 className="text-4xl font-semibold tracking-tight">OpsPilot</h1>
       <p className="max-w-xl text-black/60 dark:text-white/60">
