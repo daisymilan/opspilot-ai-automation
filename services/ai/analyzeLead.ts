@@ -19,5 +19,5 @@ export async function analyzeLead(
   input: LeadAnalysisInput,
 ): Promise<AnalyzeLeadResult> {
   const analysis = await provider.analyzeLead(input);
-  return { analysis, model: provider.model, promptVersion: provider.promptVersion };
+  return { analysis, model: provider.model, promptVersion: provider.leadAnalysisPromptVersion };
 }

@@ -1,0 +1,138 @@
+{
+  "name": "OpsPilot - Document Intelligence",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "document-intelligence",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "b5f6a9e2-1c3d-4e7a-9f0b-2a8c6d4e1f3a",
+      "name": "01 Receive Document",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "opspilot-document-intelligence",
+      "notes": "Triggered by services/documents/triggerDocumentWorkflow.ts after a document is uploaded. Authenticated via the same Header Auth credential as the lead-intelligence workflow (see docs/document-intelligence.md) — reused, not re-provisioned, since it's the same trusted app<->n8n boundary.",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "opspilot-webhook-secret",
+          "name": "OpsPilot Webhook Secret"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "has-document-id",
+              "leftValue": "={{ $json.body.documentId }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "notEmpty", "singleValue": true }
+            },
+            {
+              "id": "has-execution-id",
+              "leftValue": "={{ $json.body.executionId }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "notEmpty", "singleValue": true }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d8e1f4a7-2b5c-4d8e-a1f0-3b9d7e5f2a4b",
+      "name": "02 Validate Input",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [460, 300],
+      "notes": "Payload-shape validation only (documentId/executionId present) — the document row itself was already validated when it was created. This just guards against a malformed or malicious webhook call."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.APP_BASE_URL + '/api/documents/' + $json.body.documentId + '/analyze' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "X-Webhook-Secret", "value": "={{ $env.N8N_WEBHOOK_SECRET }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ executionId: $json.body.executionId }) }}",
+        "options": {
+          "timeout": 35000,
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "f2a4c6e8-3d5f-4a7c-b2e1-4c6a8b0d2f4e",
+      "name": "03 Analyze Document",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 220],
+      "notes": "The entire business-logic pipeline runs server-side inside this one call — idempotency check, file download from storage, real Claude document call, Zod validation of the AI output, business rules (confidence + amount threshold), persisting document_extractions, creating an approval if required, updating the execution record, and writing audit log entries. See services/documents/analyzeDocumentPipeline.ts. n8n does not reimplement any of this. 'neverError' is on so this node's output (success or failure) can be forwarded to the caller instead of halting the workflow."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": "={{ $json.success ? 200 : 422 }}"
+        }
+      },
+      "id": "a1c3e5f7-4b6d-4c8e-a3f2-5d7b9c1e3a5f",
+      "name": "04 Respond With Result",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.2,
+      "position": [900, 220],
+      "notes": "Forwards the analyze endpoint's own response (success/failure, documentExtractionId, requiresApproval, or error) straight back to the caller."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: false, error: 'documentId and executionId are required' } }}",
+        "options": { "responseCode": 400 }
+      },
+      "id": "c3e5a7f9-5c7e-4d0f-b4a3-6e8c0d2f4b6a",
+      "name": "05 Respond Invalid Request",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.2,
+      "position": [680, 420]
+    }
+  ],
+  "connections": {
+    "01 Receive Document": {
+      "main": [[{ "node": "02 Validate Input", "type": "main", "index": 0 }]]
+    },
+    "02 Validate Input": {
+      "main": [
+        [{ "node": "03 Analyze Document", "type": "main", "index": 0 }],
+        [{ "node": "05 Respond Invalid Request", "type": "main", "index": 0 }]
+      ]
+    },
+    "03 Analyze Document": {
+      "main": [[{ "node": "04 Respond With Result", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "id": "opspilot-document-intelligence",
+  "tags": []
+}

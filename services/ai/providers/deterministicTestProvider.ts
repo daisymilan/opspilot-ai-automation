@@ -1,4 +1,5 @@
 import type { LeadAnalysis, LeadAnalysisInput } from "../schema";
+import type { DocumentAnalysisInput, DocumentExtraction } from "@/services/documents/schema";
 import type { AIProvider } from "../types";
 
 /**
@@ -14,7 +15,8 @@ import type { AIProvider } from "../types";
  */
 export class DeterministicTestProvider implements AIProvider {
   readonly model = "deterministic-test-provider";
-  readonly promptVersion = "test-fixture";
+  readonly leadAnalysisPromptVersion = "test-fixture";
+  readonly documentExtractionPromptVersion = "test-fixture";
 
   async analyzeLead(input: LeadAnalysisInput): Promise<LeadAnalysis> {
     const text = `${input.message ?? ""} ${input.company ?? ""}`.toLowerCase();
@@ -32,6 +34,30 @@ export class DeterministicTestProvider implements AIProvider {
       confidence: highIntent ? 0.9 : 0.75,
       recommended_action: highIntent ? "schedule_call" : "send_follow_up",
       reasoning_summary: `Deterministic test fixture: keyword match on "automat"/"urgent" = ${highIntent}.`,
+    };
+  }
+
+  /**
+   * There's no real file to OCR here, so the fixture's "file content" is
+   * just the base64-decoded text itself — tests encode plain keyword
+   * strings (e.g. "high_amount", "low_confidence") instead of real PDF/
+   * image bytes, the same keyword-matching convention analyzeLead above
+   * uses for message/company text.
+   */
+  async analyzeDocument(input: DocumentAnalysisInput): Promise<DocumentExtraction> {
+    const text = Buffer.from(input.data, "base64").toString("utf8").toLowerCase();
+    const highAmount = text.includes("high_amount");
+    const lowConfidence = text.includes("low_confidence");
+    const amount = highAmount ? 5000 : 250;
+
+    return {
+      vendor_name: text.includes("no_vendor") ? null : "Acme Testing Supplies",
+      invoice_number: "INV-TEST-0001",
+      amount,
+      currency: "USD",
+      due_date: "2026-09-01",
+      line_items: [{ description: "Test line item", quantity: 1, amount }],
+      confidence: lowConfidence ? 0.4 : 0.9,
     };
   }
 }

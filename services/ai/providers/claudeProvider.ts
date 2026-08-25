@@ -2,6 +2,15 @@ import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { leadAnalysisSchema, type LeadAnalysis, type LeadAnalysisInput } from "../schema";
 import { LEAD_ANALYSIS_PROMPT_VERSION, buildLeadAnalysisRequest } from "../prompts/leadAnalysis";
+import {
+  DOCUMENT_EXTRACTION_PROMPT_VERSION,
+  buildDocumentExtractionRequest,
+} from "../prompts/documentExtraction";
+import {
+  documentExtractionSchema,
+  type DocumentAnalysisInput,
+  type DocumentExtraction,
+} from "@/services/documents/schema";
 import type { AIProvider } from "../types";
 
 /** ANTHROPIC_API_KEY missing or otherwise misconfigured — never caught and papered over with fake data. */
@@ -18,7 +27,8 @@ const DEFAULT_MODEL = "claude-sonnet-5";
 /** Real Claude integration. Throws loudly rather than returning placeholder data when misconfigured or failing. */
 export class ClaudeProvider implements AIProvider {
   readonly model: string;
-  readonly promptVersion = LEAD_ANALYSIS_PROMPT_VERSION;
+  readonly leadAnalysisPromptVersion = LEAD_ANALYSIS_PROMPT_VERSION;
+  readonly documentExtractionPromptVersion = DOCUMENT_EXTRACTION_PROMPT_VERSION;
   private readonly client: Anthropic;
 
   constructor() {
@@ -63,6 +73,43 @@ export class ClaudeProvider implements AIProvider {
     }
 
     const parsed = leadAnalysisSchema.safeParse(toolUse.input);
+    if (!parsed.success) {
+      throw new AIOutputValidationError(
+        `AI output failed schema validation: ${parsed.error.issues.map((issue) => issue.message).join("; ")}`,
+      );
+    }
+
+    return parsed.data;
+  }
+
+  async analyzeDocument(input: DocumentAnalysisInput): Promise<DocumentExtraction> {
+    const { system, userContent, tool, toolName } = buildDocumentExtractionRequest(input);
+
+    let response;
+    try {
+      response = await this.client.messages.create({
+        model: this.model,
+        max_tokens: 1024,
+        system,
+        messages: [{ role: "user", content: userContent }],
+        tools: [tool],
+        tool_choice: { type: "tool", name: toolName },
+      });
+    } catch (err) {
+      throw new AIProviderError(
+        `Claude API call failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+
+    const toolUse = response.content.find(
+      (block): block is Anthropic.ToolUseBlock =>
+        block.type === "tool_use" && block.name === toolName,
+    );
+    if (!toolUse) {
+      throw new AIOutputValidationError("Claude did not return the expected structured tool call.");
+    }
+
+    const parsed = documentExtractionSchema.safeParse(toolUse.input);
     if (!parsed.success) {
       throw new AIOutputValidationError(
         `AI output failed schema validation: ${parsed.error.issues.map((issue) => issue.message).join("; ")}`,
