@@ -124,6 +124,13 @@ file_size_limit = "50MiB"
 # allowed_mime_types = ["image/png", "image/jpeg"]
 # objects_path = "./images"
 
+# Phase 5 (AI Document Intelligence) upload target. Private; RLS is defined
+# in supabase/migrations/20260825120020_documents_storage.sql.
+[storage.buckets.documents]
+public = false
+file_size_limit = "10MiB"
+allowed_mime_types = ["application/pdf", "image/png", "image/jpeg"]
+
 # Allow connections via S3 compatible clients
 [storage.s3_protocol]
 enabled = true

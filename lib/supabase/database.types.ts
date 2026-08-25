@@ -204,6 +204,68 @@ export interface Database {
         Update: never;
         Relationships: [];
       };
+      documents: {
+        Row: {
+          id: string;
+          organization_id: string;
+          uploaded_by: string | null;
+          file_path: string;
+          file_name: string;
+          mime_type: "application/pdf" | "image/png" | "image/jpeg";
+          size_bytes: number;
+          document_type: "invoice";
+          status: "uploaded" | "analyzing" | "extracted" | "failed";
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id?: string;
+          uploaded_by?: string | null;
+          file_path: string;
+          file_name: string;
+          mime_type: "application/pdf" | "image/png" | "image/jpeg";
+          size_bytes: number;
+          document_type?: "invoice";
+          status?: "uploaded" | "analyzing" | "extracted" | "failed";
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["documents"]["Insert"]>;
+        Relationships: [];
+      };
+      document_extractions: {
+        Row: {
+          id: string;
+          document_id: string;
+          organization_id: string;
+          vendor_name: string | null;
+          invoice_number: string | null;
+          amount: number | null;
+          currency: string | null;
+          due_date: string | null;
+          line_items: unknown[];
+          confidence: number;
+          model: string;
+          prompt_version: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          document_id: string;
+          organization_id?: string;
+          vendor_name?: string | null;
+          invoice_number?: string | null;
+          amount?: number | null;
+          currency?: string | null;
+          due_date?: string | null;
+          line_items?: unknown[];
+          confidence: number;
+          model: string;
+          prompt_version: string;
+          created_at?: string;
+        };
+        Update: never;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

@@ -18,6 +18,8 @@ for why `supabase/` rather than `database/` owns the SQL.
 | `approvals`           | Human-in-the-loop queue gating sensitive AI-recommended actions.                |
 | `lead_scores`         | AI-generated lead analysis history (Phase 2). Written by the service role only. |
 | `audit_logs`          | Append-only audit trail. No role has update/delete on this table.               |
+| `documents`           | Uploaded document metadata (Phase 5). File bytes live in the `documents` storage bucket. |
+| `document_extractions`| AI-generated document extraction history (Phase 5). Written by the service role only. |
 
 ## Relationships
 
@@ -27,12 +29,15 @@ organizations 1──* leads (organization_id)
 organizations 1──* workflow_executions (organization_id)
 organizations 1──* approvals (organization_id)
 organizations 1──* audit_logs (organization_id)
+organizations 1──* documents (organization_id)
 
 auth.users 1──1 profiles (id = auth.users.id)
 profiles 1──* leads (owner_id, nullable)
 profiles 1──* approvals (requested_by / reviewed_by, nullable)
 profiles 1──* audit_logs (actor_id, nullable)
+profiles 1──* documents (uploaded_by, nullable)
 leads 1──* lead_scores (lead_id) — one row per analysis run, not overwritten on re-analysis
+documents 1──* document_extractions (document_id) — one row per analysis run, not overwritten on re-analysis
 ```
 
 `workflow_executions`, `approvals`, and `audit_logs` also carry a polymorphic
@@ -45,9 +50,9 @@ including `succeeded`, are unchanged) — see
 
 ## Entities planned for later phases
 
-`meetings`, `meeting_action_items`, `documents`, `document_extractions`,
-`ai_generations`, `notifications`, `integrations` — introduced alongside the
-workflow that needs them, not created wholesale up front.
+`meetings`, `meeting_action_items`, `ai_generations`, `notifications`,
+`integrations` — introduced alongside the workflow that needs them, not
+created wholesale up front.
 
 ## Reproducing the database from scratch
 
