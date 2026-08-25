@@ -67,9 +67,13 @@ simultaneously.
 2. **AI Meeting Intelligence** — Meeting/transcript → AI Summary → Extract Action Items →
    Identify Owners → Identify Dates → Generate Follow-up Draft → Human Review → Approval →
    Action → Audit Log
-3. **AI Document Intelligence** — Upload → Storage → Text Extraction → AI Analysis →
-   Structured Output → Zod Validation → Database → Human Review (when appropriate) →
-   Audit Log
+3. **AI Document Intelligence** — **implemented, Phase 5.** Upload → Storage → AI
+   Analysis (Claude reads PDFs/images natively — no separate text-extraction step, see
+   [document-intelligence.md](document-intelligence.md#deliberate-simplification-vs-the-original-architecture-sketch))
+   → Structured Output → Zod Validation → Business Rules → Human Approval (when
+   required) → Execution + Audit Log. Same approval/audit engine as Lead Intelligence,
+   a second vertical on the same foundation. See
+   [document-intelligence.md](document-intelligence.md).
 4. **Automated Business Reporting** — Aggregate execution/lead/approval metrics → AI-assisted
    operations summary
 
@@ -215,12 +219,20 @@ issued it.
   application-enforced) reviewer boundary, a safe-by-construction retry, and an
   execution timeline built only from real audit events. See
   [operations-center.md](operations-center.md).
-- **Phase 4 (this phase)** — Productionization: the same application deployed
+- **Phase 4** — Productionization: the same application deployed
   for real — GitHub → Vercel → Supabase Cloud → production n8n → Claude API.
   No new application features and no architecture changes; this phase is
   entirely about environment separation, hosted-database migration
   deployment, production auth/webhook configuration, and honest production
   verification. See [production-deployment.md](production-deployment.md).
-- **Later phases** — Meeting Intelligence → Document Intelligence → Reporting.
+- **Phase 5** — AI Document Intelligence: the second full vertical slice on the same
+  approval/audit engine — `documents`/`document_extractions` tables + RLS + a private
+  storage bucket, `ClaudeProvider.analyzeDocument`, business rules gating human approval
+  (confidence + amount threshold), n8n orchestration
+  (`workflows/document-intelligence.json`), and a working `/documents` UI. Also
+  generalized the Phase 3 Operations Center (Approval Center, Execution Explorer) to be
+  genuinely entity-type-agnostic, which it claimed to be but wasn't yet. See
+  [document-intelligence.md](document-intelligence.md).
+- **Later phases** — Meeting Intelligence → Reporting.
 
 Each phase is expected to be verified (tests, build, manual check) before the next begins.

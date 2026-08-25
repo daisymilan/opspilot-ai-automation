@@ -10,10 +10,11 @@ observability.
 **GitHub**: [github.com/daisymilan/opspilot-ai-automation](https://github.com/daisymilan/opspilot-ai-automation)
 **Live demo**: [opspilot-ai-automation.vercel.app](https://opspilot-ai-automation.vercel.app)
 — deployed and reachable (Vercel + Supabase Cloud + n8n Cloud). This confirms the app
-itself, not a fully working AI pipeline end to end: AI lead-analysis is currently
-degraded by an unresolved Anthropic billing issue, so a real lead's analysis will
-presently fail with a genuine billing error rather than complete — see
-[Known limitations](#known-limitations). See
+itself, not a fully working AI pipeline end to end in *production* specifically: the
+Anthropic billing failure previously documented here was re-verified as resolved
+against the local development environment's Claude API key (a real end-to-end document
+extraction succeeded, see [Known limitations](#known-limitations)), but production uses
+a separate deployment and has not been re-confirmed since. See
 [docs/production-deployment.md](docs/production-deployment.md) for the full deployment
 status, including what has and hasn't been independently verified.
 
@@ -47,27 +48,33 @@ flowchart LR
     Browser["Browser"]
 
     subgraph Vercel["Vercel — Next.js"]
-        App["App Router\nServer Components / Actions\n/api/leads/:id/analyze"]
+        App["App Router\nServer Components / Actions\n/api/leads/:id/analyze\n/api/documents/:id/analyze"]
     end
 
     subgraph Supabase["Supabase Cloud"]
         DB[("Postgres + RLS")]
+        Storage[("Storage — documents bucket")]
         Auth["Supabase Auth"]
     end
 
     subgraph N8N["n8n"]
         WF["Lead Intelligence workflow"]
+        WF2["Document Intelligence workflow"]
     end
 
     Claude["Anthropic Claude API"]
 
     Browser --> App
     App -- "anon key, RLS-scoped" --> DB
+    App -- "anon key, RLS-scoped" --> Storage
     App -- "session cookie" --> Auth
     App -- "service role (server-only)" --> DB
     App -- "trigger (shared secret)" --> WF
+    App -- "trigger (shared secret)" --> WF2
     WF -- "callback (shared secret)" --> App
+    WF2 -- "callback (shared secret)" --> App
     WF -- "structured request" --> Claude
+    WF2 -- "structured request" --> Claude
 ```
 
 n8n owns orchestration only — receiving triggers, calling third-party systems. All
@@ -91,6 +98,20 @@ structured output, no free-text parsing) → Zod schema validation → business 
 required → the execution's terminal state → audit log entries at every step, including
 failure. See [docs/lead-intelligence.md](docs/lead-intelligence.md) for the full sequence
 diagram and error-handling table.
+
+## Document Intelligence workflow
+
+```
+Invoice uploaded → n8n → Claude (document/image input, structured output) → Zod validation
+  → business rules → human approval (when required) → execution recorded → audit logged
+```
+
+The second vertical slice on the same engine as Lead Intelligence — same approval queue,
+same execution/audit tables, same n8n instance. An uploaded PDF/PNG/JPEG invoice is
+extracted by Claude (native document/image understanding, no separate OCR step) into
+vendor, amount, currency, due date, and line items; an extraction with low confidence or
+an amount over a configurable threshold requires human approval before it's actionable.
+See [docs/document-intelligence.md](docs/document-intelligence.md).
 
 ## Operations Center
 
@@ -131,12 +152,12 @@ Real results from this repository, not inflated:
 
 ```
 $ npm test                 # unit — pure logic, no external dependencies
- Test Files  11 passed (11)
-      Tests  89 passed (89)
+ Test Files  13 passed (13)
+      Tests  112 passed (112)
 
-$ npm run test:integration  # real local Postgres, RLS actually exercised
- Test Files  3 passed (3)
-      Tests  27 passed (27)
+$ npm run test:integration  # real local Postgres + Storage, RLS actually exercised
+ Test Files  4 passed (4)
+      Tests  43 passed (43)
 ```
 
 Unit tests cover Zod schemas, route-protection logic, business rules, execution
@@ -171,15 +192,24 @@ below rather than left implicit.
 
 Stated explicitly rather than hidden:
 
-- **Claude billing**: the most recent real, live end-to-end Anthropic API call made in
-  this project's development returned a genuine `invalid_request_error` — insufficient
-  account credit — not a bug in this codebase. That failure is handled correctly (the
-  execution is marked `failed` with the real error preserved, and the dashboard's AI
-  health indicator shows `billing_failure`, never a fabricated "healthy"), but a fully
-  successful real Claude completion has not been re-verified since. This will be updated
-  once re-confirmed against a funded account.
+- **Claude billing (local: resolved, production: unverified)**: an earlier real, live
+  end-to-end Anthropic API call in this project's development returned a genuine
+  `invalid_request_error` — insufficient account credit. That failure was always handled
+  correctly (the execution is marked `failed` with the real error preserved, and the
+  dashboard's AI health indicator shows `billing_failure`, never a fabricated "healthy").
+  Since then, a fully successful real Claude completion **has** been re-verified against
+  the local development environment's API key (Phase 5's document-extraction pipeline,
+  run for real against the live Anthropic API — see
+  [docs/document-intelligence.md](docs/document-intelligence.md#local-setup)). Production
+  uses a separate key/deployment and has not been re-confirmed since.
 - **No password-reset flow** — not implemented in the app (no route, no Server Action).
-- **Meeting Intelligence, Document Intelligence, and Reporting** are planned (see
+- **Document Intelligence's n8n hop is unverified locally** — the pipeline itself was
+  verified for real (see above), and the app↔n8n webhook trust boundary is identical to
+  Lead Intelligence's (already verified there), but `workflows/document-intelligence.json`
+  was not imported into a running local n8n instance and exercised end-to-end in the same
+  session that built it — see
+  [docs/document-intelligence.md#local-setup](docs/document-intelligence.md#local-setup).
+- **Meeting Intelligence and Reporting** are planned (see
   [docs/architecture.md](docs/architecture.md#the-four-core-workflows)) but not built.
 - **Playwright E2E** is not configured yet — current test coverage is unit + integration
   only (see [Testing](#testing)).
@@ -197,7 +227,7 @@ opspilot/
 ├── components/   UI components (components/ui = presentational primitives)
 ├── lib/          Framework-agnostic utilities, incl. lib/supabase (client/server/service-role)
 ├── services/     Business logic: auth, leads, approvals, executions, dashboard, AI, n8n adapter, audit
-├── workflows/    n8n workflow definitions (workflows/lead-intelligence.json)
+├── workflows/    n8n workflow definitions (lead-intelligence.json, document-intelligence.json)
 ├── supabase/     Migrations + dev-only seed data (source of truth for the schema)
 ├── scripts/      Operator scripts (e.g. scripts/seed-demo-data.mjs — production demo data only)
 ├── database/     Human-readable data model docs pointing into supabase/
@@ -215,7 +245,9 @@ See [docs/architecture.md](docs/architecture.md) for the reasoning behind this s
 See [docs/development-setup.md](docs/development-setup.md) for full setup instructions,
 including the local Supabase stack (requires Docker) and seed login credentials. For the
 AI Lead Intelligence flow specifically (n8n + Claude), see
-[docs/lead-intelligence.md](docs/lead-intelligence.md#local-setup). For the
+[docs/lead-intelligence.md](docs/lead-intelligence.md#local-setup); for AI Document
+Intelligence, see
+[docs/document-intelligence.md](docs/document-intelligence.md#local-setup). For the
 Dashboard/Approvals/Executions UI, see [docs/operations-center.md](docs/operations-center.md).
 For production deployment, see [docs/production-deployment.md](docs/production-deployment.md).
 
