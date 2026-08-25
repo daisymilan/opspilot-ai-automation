@@ -2,19 +2,18 @@
 
 AI-powered business operations automation, with human-in-the-loop decisioning built in
 from the start rather than bolted on. OpsPilot demonstrates how a real business can
-automate repetitive operations — lead triage today, meeting and document intelligence
-later — using event-driven workflows (n8n), structured LLM output (Claude), a
-multi-tenant Postgres schema with real Row Level Security, and full execution/audit
-observability.
+automate repetitive operations — lead triage and document (invoice) intelligence today,
+meeting intelligence later — using event-driven workflows (n8n), structured LLM output
+(Claude), a multi-tenant Postgres schema with real Row Level Security, and full
+execution/audit observability.
 
 **GitHub**: [github.com/daisymilan/opspilot-ai-automation](https://github.com/daisymilan/opspilot-ai-automation)
 **Live demo**: [opspilot-ai-automation.vercel.app](https://opspilot-ai-automation.vercel.app)
-— deployed and reachable (Vercel + Supabase Cloud + n8n Cloud). This confirms the app
-itself, not a fully working AI pipeline end to end in *production* specifically: the
-Anthropic billing failure previously documented here was re-verified as resolved
-against the local development environment's Claude API key (a real end-to-end document
-extraction succeeded, see [Known limitations](#known-limitations)), but production uses
-a separate deployment and has not been re-confirmed since. See
+— deployed and reachable, and the full AI pipeline has been verified working
+end-to-end in production itself: a real invoice uploaded through the live app was
+picked up by n8n Cloud, analyzed by the real Anthropic API, and correctly extracted
+(see [Known limitations](#known-limitations) for the couple of real environment quirks
+found and fixed along the way). See
 [docs/production-deployment.md](docs/production-deployment.md) for the full deployment
 status, including what has and hasn't been independently verified.
 
@@ -192,23 +191,22 @@ below rather than left implicit.
 
 Stated explicitly rather than hidden:
 
-- **Claude billing (local: resolved, production: unverified)**: an earlier real, live
-  end-to-end Anthropic API call in this project's development returned a genuine
-  `invalid_request_error` — insufficient account credit. That failure was always handled
-  correctly (the execution is marked `failed` with the real error preserved, and the
-  dashboard's AI health indicator shows `billing_failure`, never a fabricated "healthy").
-  Since then, a fully successful real Claude completion **has** been re-verified against
-  the local development environment's API key (Phase 5's document-extraction pipeline,
-  run for real against the live Anthropic API — see
-  [docs/document-intelligence.md](docs/document-intelligence.md#local-setup)). Production
-  uses a separate key/deployment and has not been re-confirmed since.
+- **Claude billing — resolved.** An earlier real, live end-to-end Anthropic API call in
+  this project's development returned a genuine `invalid_request_error` — insufficient
+  account credit. That failure was always handled correctly (the execution is marked
+  `failed` with the real error preserved, and the dashboard's AI health indicator shows
+  `billing_failure`, never a fabricated "healthy"). Since then, a fully successful real
+  Claude completion **has** been verified — first locally, then end-to-end in
+  **production** itself (Phase 5's document-extraction pipeline, run for real through
+  the live app, n8n Cloud, and production's own `ANTHROPIC_API_KEY` — see
+  [docs/production-deployment.md](docs/production-deployment.md#current-status)).
 - **No password-reset flow** — not implemented in the app (no route, no Server Action).
-- **Document Intelligence's n8n hop is unverified locally** — the pipeline itself was
-  verified for real (see above), and the app↔n8n webhook trust boundary is identical to
-  Lead Intelligence's (already verified there), but `workflows/document-intelligence.json`
-  was not imported into a running local n8n instance and exercised end-to-end in the same
-  session that built it — see
-  [docs/document-intelligence.md#local-setup](docs/document-intelligence.md#local-setup).
+- **n8n Cloud trial has no Variables feature** (confirmed live — Enterprise-gated,
+  absent from Settings). Both workflows read their app URL/webhook secret via literal
+  hardcoded node values in production as a result, rather than the portable `$vars.*`
+  approach the committed workflow JSON uses — a real, disclosed environment constraint,
+  not an oversight. See
+  [docs/production-deployment.md#required-n8n-environment-variables](docs/production-deployment.md#required-n8n-environment-variables).
 - **Meeting Intelligence and Reporting** are planned (see
   [docs/architecture.md](docs/architecture.md#the-four-core-workflows)) but not built.
 - **Playwright E2E** is not configured yet — current test coverage is unit + integration

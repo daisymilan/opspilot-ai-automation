@@ -204,7 +204,27 @@ headless bootstrap path for normal use):
    `OpsPilot Webhook Secret`, header name `X-Webhook-Secret`, value = your
    `N8N_WEBHOOK_SECRET`.
 4. Open the imported workflow, attach that credential to the `01 Receive Lead` node.
-5. Activate the workflow (toggle in the top right).
+5. **Settings → Variables**, create `APP_BASE_URL` and `N8N_WEBHOOK_SECRET` with the
+   same values as `.env.local`. The `03 Analyze Lead` node reads these via `$vars.*`,
+   not `$env.*` — n8n Cloud blocks `$env` access inside node expressions by default
+   (`N8N_BLOCK_ENV_ACCESS_IN_NODE`), so `$vars` (n8n's own Variables feature, identical
+   on Cloud and self-hosted) is used everywhere for portability, not just on Cloud. A
+   workflow using `$env.APP_BASE_URL` here fails with `access to env vars denied` on
+   n8n Cloud — found during Phase 5's production verification (see
+   [document-intelligence.md](document-intelligence.md#local-setup)).
+
+   **On an n8n Cloud trial**, Variables is itself an Enterprise-gated feature (not in
+   the trial's Settings sidebar at all — confirmed live, not assumed). If it's missing
+   for you too, skip Variables and instead directly edit the `03 Analyze Lead` node
+   after import: replace the URL field with the literal base URL baked in (keeping only
+   the dynamic id as an expression) —
+   `={{ "https://your-app.vercel.app/api/leads/" + $json.body.leadId + "/analyze" }}`
+   — and replace the `X-Webhook-Secret` header's value with the literal secret string
+   itself (no `{{ }}`). This is exactly how the Header Auth credential's value is
+   already handled: entered once through the UI, never committed to the workflow JSON.
+   This is what production actually runs today (see
+   [production-deployment.md](production-deployment.md#required-n8n-environment-variables)).
+6. Activate the workflow (toggle in the top right).
 
 > **What was actually verified in this session, and how.** I could script steps 1–5
 > programmatically via n8n's own REST API (`/rest/owner/setup`, `/rest/login`,

@@ -59,12 +59,12 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.APP_BASE_URL + '/api/leads/' + $json.body.leadId + '/analyze' }}",
+        "url": "={{ $vars.APP_BASE_URL + '/api/leads/' + $json.body.leadId + '/analyze' }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             { "name": "Content-Type", "value": "application/json" },
-            { "name": "X-Webhook-Secret", "value": "={{ $env.N8N_WEBHOOK_SECRET }}" }
+            { "name": "X-Webhook-Secret", "value": "={{ $vars.N8N_WEBHOOK_SECRET }}" }
           ]
         },
         "sendBody": true,

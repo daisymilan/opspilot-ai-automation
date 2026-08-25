@@ -14,12 +14,16 @@ services:
   # Official image used directly — this is off-the-shelf infrastructure,
   # not application code, so it doesn't go through our own Dockerfile.
   #
-  # Required env vars (see .env.example): N8N_ENCRYPTION_KEY,
-  # N8N_WEBHOOK_SECRET, APP_BASE_URL (how n8n reaches the Next.js app —
-  # defaults to Docker Desktop's host gateway since the app runs via
-  # `npm run dev` on the host, not in Docker, during local development).
-  # All read from .env.local via env_file below — never hardcoded here,
-  # never committed.
+  # Required env vars (see .env.example): N8N_ENCRYPTION_KEY. Read from
+  # .env.local via env_file below — never hardcoded here, never committed.
+  #
+  # APP_BASE_URL and N8N_WEBHOOK_SECRET are NOT read as container env vars
+  # by the workflows — n8n Cloud blocks `$env.*` access inside node
+  # expressions by default (N8N_BLOCK_ENV_ACCESS_IN_NODE), so both
+  # workflows use n8n's own Variables feature (`$vars.*`) instead, which
+  # works identically on Cloud and self-hosted. Set these once via the n8n
+  # UI (Settings → Variables) after import — see docs/lead-intelligence.md
+  # and docs/document-intelligence.md's local setup sections.
   #
   # Runs alongside local Supabase without conflict: Supabase occupies
   # 54321-54329; n8n uses 5678 only.

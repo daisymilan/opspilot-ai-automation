@@ -14,26 +14,54 @@ Confirmed against the real hosted project/deployment, not assumed:
   homepage, `/login`, and `/signup` return 200; `/dashboard` correctly redirects an
   unauthenticated request to `/login` (verified directly via HTTP checks against the
   live URL).
-- **Supabase Cloud**: linked, all 14 local migrations pushed and confirmed matching
-  remote (`supabase migration list`). Schema, RLS (enabled on all 7 tables), policies,
+- **Supabase Cloud**: linked, all 17 local migrations pushed and confirmed matching
+  remote (`supabase migration list`) — the original 14 plus Phase 5's 3
+  (`documents`, `document_extractions`, storage RLS). Schema, RLS (enabled on every
+  organization-owned table, `documents`/`document_extractions` included), policies,
   functions/triggers (including the `auth.users` signup trigger), constraints, and
   indexes were all directly verified via read-only queries against the hosted
-  database. `supabase/seed.sql` was confirmed **not** applied — production started
-  with zero rows.
+  database. The `documents` storage bucket was created directly via the Storage API
+  (private, 10MB limit, pdf/png/jpeg) and confirmed with matching config.
+  `supabase/seed.sql` was confirmed **not** applied — production started with zero
+  rows, and stayed that way (Phase 5's own verification throwaway account/org/files
+  were deleted afterward — see below).
 - **n8n**: **n8n Cloud** is the actual production host — not the Railway
-  recommendation below, which predates that decision. The
-  `workflows/lead-intelligence.json` workflow is imported, active, and its
-  production webhook has been exercised for real.
-- **End-to-end pipeline, exercised for real**: a lead created in production produced
-  a real `workflow_executions` row, was picked up by the n8n Cloud webhook, called
-  `/api/leads/:id/analyze` in production, and reached the real Anthropic API —
-  confirmed by directly reading the resulting `workflow_executions`/`audit_logs` rows
-  on the hosted database (not taken on faith).
-- **Anthropic billing — still NOT resolved.** That real Claude call failed with a
-  genuine `invalid_request_error` (insufficient account credit) — the same limitation
-  described in the [README's Known limitations](../README.md#known-limitations)
-  section. This deployment does **not** fix it. A successful real end-to-end AI
-  analysis in production has not been demonstrated.
+  recommendation below, which predates that decision. Both
+  `workflows/lead-intelligence.json` and `workflows/document-intelligence.json` are
+  imported, active, and their production webhooks have been exercised for real
+  (document-intelligence end-to-end; lead-intelligence's webhook auth confirmed live,
+  full re-run after the `$env`→literal-value fix below not yet repeated).
+- **End-to-end pipeline, exercised for real, twice.** A lead created in production
+  earlier reached the real Anthropic API (confirmed via `workflow_executions`/
+  `audit_logs`). Separately, in this Phase 5 session: a throwaway account was created
+  via the live `/signup` page, a real invoice PDF uploaded through the actual UI,
+  picked up by n8n Cloud's `document-intelligence` webhook, called back into
+  `/api/documents/:id/analyze`, reached the real Anthropic API with production's own
+  `ANTHROPIC_API_KEY`, and produced a genuine 98%-confidence extraction (vendor,
+  invoice number, $432.10/USD, due date, line item) — confirmed by reading the
+  rendered detail page. The throwaway account, org, and uploaded file were deleted
+  afterward via the Auth admin API and Storage API.
+- **Anthropic billing — resolved, confirmed against production's own key.** An
+  earlier real Claude call in production failed with a genuine `invalid_request_error`
+  (insufficient account credit) at the time this was originally written. The Phase 5
+  document-extraction run above used production's actual `ANTHROPIC_API_KEY` (not the
+  local dev key) and succeeded for real — this limitation is resolved, not just
+  locally. See the [README's Known limitations](../README.md#known-limitations).
+- **Phase 5 finding, found and fixed: `$env.*` is blocked in n8n Cloud node
+  expressions** (`N8N_BLOCK_ENV_ACCESS_IN_NODE`) — both workflows originally read
+  `APP_BASE_URL`/`N8N_WEBHOOK_SECRET` via `$env.*` inside their `03 Analyze …` HTTP
+  Request node, which fails outright on this n8n Cloud project
+  (`access to env vars denied`) — contradicting the earlier "reached the real
+  Anthropic API" claim, which either predates this restriction being active or wasn't
+  hit by the specific check performed then. n8n's Variables feature (the natural
+  `$env` replacement) turned out to be **Enterprise-gated on this trial plan**
+  (confirmed live — absent from Settings entirely), so the actual fix live in
+  production today is literal hardcoded values in both workflows' `03 Analyze …`
+  nodes — see
+  [Required n8n environment variables](#required-n8n-environment-variables). Verified
+  working via the document-intelligence end-to-end run above; a lead re-run to
+  confirm the same fix on that workflow has not been separately repeated in this
+  session.
 - **Not yet independently verified**: the production Supabase Auth settings
   described below (Site URL, redirect URLs, email-confirmation toggle) have not been
   confirmed as actually applied in the hosted project's dashboard; the
@@ -234,12 +262,40 @@ Set on the n8n host itself (never in Vercel, never in Git):
 | `N8N_HOST` / `WEBHOOK_URL` | The n8n host's own public HTTPS URL, so generated webhook URLs are correct behind the platform's proxy.                                                                                   |
 | `GENERIC_TIMEZONE`         | Matches local (`UTC`) for consistent timestamps.                                                                                                                                          |
 
-The `N8N_WEBHOOK_SECRET` value itself is **not** an n8n environment
-variable — it's stored as the value of the `OpsPilot Webhook Secret` Header
-Auth **credential**, entered once through the n8n editor UI after import
-(exactly as documented for local setup in
-[lead-intelligence.md](lead-intelligence.md#local-setup)), using a
-production-specific secret value independently generated from the local one.
+`N8N_WEBHOOK_SECRET` is used in **two** places inside n8n, and neither is a
+container/process environment variable read via `$env`:
+
+1. **Inbound** (app → n8n): the value of the `OpsPilot Webhook Secret`
+   Header Auth **credential**, entered once through the n8n editor UI after
+   import.
+2. **Outbound** (n8n → app): each workflow's `03 Analyze …` HTTP Request
+   node sends it as the `X-Webhook-Secret` header. **Not** `$env.*`: n8n
+   Cloud blocks `$env` access inside node expressions by default
+   (`N8N_BLOCK_ENV_ACCESS_IN_NODE`), which is exactly what surfaced this —
+   found live during Phase 5's production verification, when
+   `workflows/document-intelligence.json`'s original `$env.APP_BASE_URL`
+   failed with `access to env vars denied`, and turned out to affect
+   `workflows/lead-intelligence.json` identically.
+
+   The committed workflow JSON uses n8n's **Variables** feature
+   (`$vars.APP_BASE_URL`/`$vars.N8N_WEBHOOK_SECRET`, Settings → Variables) as
+   the portable fix — works the same way on Cloud and self-hosted, no secret
+   in Git either way. **But on this project's actual n8n Cloud plan
+   (trial), Variables is itself Enterprise-gated** — confirmed live: it's
+   not in the trial's Settings sidebar at all, only "Environments" (a
+   different, also-gated feature) is. So **what production actually runs**
+   is literal hardcoded values pasted directly into each workflow's `03
+   Analyze …` node (URL field's base and the header's value), entered
+   manually after import — exactly like the credential value already is,
+   never committed to the workflow JSON. If/when this project's n8n plan
+   changes to one with Variables, switching back to `$vars.*` (matching the
+   committed JSON) is a drop-in change, not a rewrite.
+
+Both the credential and the URL/secret values (Variables, or literal
+node values on a Variables-less plan) are entered once through the n8n
+editor UI after import (exactly as documented for local setup in
+[lead-intelligence.md](lead-intelligence.md#local-setup)), using
+production-specific values independently generated from local dev.
 
 ### Persistence
 

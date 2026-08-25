@@ -225,11 +225,17 @@ one-time setup:
 1. **Workflows → Import from File** → `workflows/document-intelligence.json`.
 2. Open the imported workflow, attach the existing `OpsPilot Webhook Secret` credential
    to the `01 Receive Document` node (reused, not re-created).
-3. Activate the workflow.
+3. The `APP_BASE_URL`/`N8N_WEBHOOK_SECRET` values (n8n Variables, or literal
+   hardcoded node values on a trial plan without Variables — see
+   [lead-intelligence.md#local-setup](lead-intelligence.md#local-setup)) are reused
+   as-is from Lead Intelligence's setup — same values, same n8n instance, nothing new
+   to configure here beyond repeating the same edit on this workflow's `03 Analyze
+   Document` node.
+4. Activate the workflow.
 
-New env var read by n8n itself: `N8N_DOCUMENT_WEBHOOK_PATH` is not required (defaults to
-`/webhook/document-intelligence` in code) unless you changed the imported workflow's
-webhook path.
+New env var, read by this app (not n8n): `N8N_DOCUMENT_WEBHOOK_PATH` is not required
+(defaults to `/webhook/document-intelligence` in code) unless you changed the imported
+workflow's webhook path.
 
 ### 3. Verify
 
@@ -244,18 +250,35 @@ Sign in, go to **Documents**, upload a PDF/PNG/JPEG invoice — with a real
 real Claude-generated extraction on the document's detail page within a few seconds.
 
 > **What was actually verified in this session, and how.** The full pipeline
-> (`services/documents/analyzeDocumentPipeline.ts`) was run directly against the real
-> Claude API with a real, hand-built single-page invoice PDF — not the deterministic test
-> provider — and correctly extracted vendor name, invoice number, a $432.10 amount, USD
-> currency, a due date, and one line item at 0.98 confidence, all persisted and readable
-> back through RLS. Separately, the upload form, list, and detail pages were driven live
-> in a real headless browser (Playwright): a real file upload through the actual Server
-> Action, and — since the document-intelligence workflow wasn't imported into the local
-> n8n instance during this session — a genuine, honestly-surfaced failure (n8n's real 404
-> "webhook not registered" response, shown verbatim on the execution record, not a
-> fabricated success). A document approval's full context (vendor, amount, confidence)
-> was confirmed rendering correctly in the Approval Center, and Approve was confirmed to
-> transition its status. **Not verified in this session**: the n8n hop itself for
-> documents (importing `workflows/document-intelligence.json` and re-running the same
-> live test docs/lead-intelligence.md describes for leads) — the same gap that
-> documentation discloses for leads' own n8n-hop testing.
+> (`services/documents/analyzeDocumentPipeline.ts`) was first run directly against the
+> real Claude API with a real, hand-built single-page invoice PDF — not the deterministic
+> test provider — and correctly extracted vendor name, invoice number, a $432.10 amount,
+> USD currency, a due date, and one line item at 0.98 confidence. Locally, the upload
+> form, list, and detail pages were driven live in a real headless browser (Playwright),
+> including a document approval's full context (vendor, amount, confidence) rendering
+> correctly in the Approval Center and Approve correctly transitioning its status.
+>
+> Then the **entire pipeline was verified for real in production**: a throwaway account
+> was created via the live `/signup` page, a real invoice PDF uploaded through the actual
+> UI, picked up by n8n Cloud's `document-intelligence` webhook, called back into
+> `/api/documents/:id/analyze` in production, reached the real Anthropic API with
+> production's own `ANTHROPIC_API_KEY`, and produced a genuine 98%-confidence extraction
+> (vendor, invoice number, $432.10/USD, due date, line item) — confirmed by reading the
+> rendered detail page, not taken on faith. This also confirms the Anthropic billing
+> issue documented in [production-deployment.md](production-deployment.md) is resolved
+> against production's own key, not just the local dev key. The throwaway account, its
+> org, and its uploaded file were deleted afterward (auth user + orphaned org + storage
+> object — the org isn't cascade-deleted by the auth user's own deletion, since
+> `organizations` has no FK to `auth.users`).
+>
+> Getting there surfaced two real, now-fixed production issues, neither of which was
+> specific to documents — both affected the pre-existing `lead-intelligence` workflow
+> identically, just never hit until this session's live testing:
+> 1. n8n Cloud blocks `$env.*` access inside node expressions by default
+>    (`N8N_BLOCK_ENV_ACCESS_IN_NODE`) — both workflows originally read
+>    `APP_BASE_URL`/`N8N_WEBHOOK_SECRET` that way.
+> 2. n8n's Variables feature (the natural replacement) turned out to be Enterprise-gated
+>    on this trial account (confirmed live — not present in Settings at all), so the
+>    actual production fix is literal hardcoded values in the two `03 Analyze …` nodes,
+>    entered manually the same way the Header Auth credential's value already is — see
+>    [production-deployment.md](production-deployment.md#required-n8n-environment-variables).
