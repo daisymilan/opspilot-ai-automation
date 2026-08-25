@@ -23,10 +23,13 @@ export function ApprovalCard({
     <div className="rounded-lg border border-black/10 dark:border-white/10 p-5 flex flex-col gap-3">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="font-medium">{approval.lead?.name ?? "Unknown lead"}</p>
+          <p className="font-medium">
+            {approval.lead?.name ?? approval.document?.file_name ?? "Unknown entity"}
+          </p>
           <p className="text-xs text-black/50 dark:text-white/50">
-            {approval.lead?.company ?? "—"}
-            {approval.lead?.email ? ` · ${approval.lead.email}` : ""}
+            {approval.lead
+              ? `${approval.lead.company ?? "—"}${approval.lead.email ? ` · ${approval.lead.email}` : ""}`
+              : (approval.document?.file_name ?? "—")}
           </p>
         </div>
         <Badge tone={APPROVAL_STATUS_TONE[approval.status]}>{approval.status}</Badge>
@@ -52,6 +55,18 @@ export function ApprovalCard({
         <p className="text-sm text-black/70 dark:text-white/70 border-l-2 border-black/10 dark:border-white/10 pl-3">
           {approval.score.reasoning_summary}
         </p>
+      ) : null}
+
+      {approval.extraction ? (
+        <div className="flex flex-wrap gap-2">
+          <Badge>confidence {(approval.extraction.confidence * 100).toFixed(0)}%</Badge>
+          {approval.extraction.amount != null ? (
+            <Badge>
+              {approval.extraction.amount.toFixed(2)} {approval.extraction.currency ?? ""}
+            </Badge>
+          ) : null}
+          {approval.extraction.vendor_name ? <Badge>{approval.extraction.vendor_name}</Badge> : null}
+        </div>
       ) : null}
 
       <p className="text-xs text-black/40 dark:text-white/40">

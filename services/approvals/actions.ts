@@ -36,11 +36,12 @@ async function findWaitingExecutionId(
   return data?.id ?? null;
 }
 
-function revalidateApprovalPages(entityId: string) {
+function revalidateApprovalPages(entityType: string, entityId: string) {
   revalidatePath("/approvals");
   revalidatePath("/executions");
   revalidatePath("/dashboard");
-  revalidatePath(`/leads/${entityId}`);
+  if (entityType === "lead") revalidatePath(`/leads/${entityId}`);
+  if (entityType === "document") revalidatePath(`/documents/${entityId}`);
 }
 
 export async function approveApprovalAction(
@@ -124,7 +125,7 @@ export async function approveApprovalAction(
     metadata: { approvalId: approval.id },
   });
 
-  revalidateApprovalPages(approval.entity_id);
+  revalidateApprovalPages(approval.entity_type, approval.entity_id);
   return {};
 }
 
@@ -206,6 +207,6 @@ export async function rejectApprovalAction(
     metadata: { approvalId: approval.id, rejectionReason: parsed.data.rejectionReason },
   });
 
-  revalidateApprovalPages(approval.entity_id);
+  revalidateApprovalPages(approval.entity_type, approval.entity_id);
   return {};
 }

@@ -2,7 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 import { summarizeExecutions, type ExecutionMetrics } from "@/services/executions/formatting";
-import { resolveLeadNames } from "@/services/executions/leadNames";
+import { resolveEntityNames } from "@/services/executions/entityNames";
 
 export interface DashboardMetrics extends ExecutionMetrics {
   totalLeads: number;
@@ -38,10 +38,10 @@ export interface RecentExecution {
   duration_ms: number | null;
   retry_count: number;
   error_message: string | null;
-  leadName: string | null;
+  entityName: string | null;
 }
 
-/** No entity_type/entity_id FK exists (polymorphic by design — see Phase 1), so lead names are resolved with a second query, not a join. */
+/** No entity_type/entity_id FK exists (polymorphic by design — see Phase 1), so entity names are resolved with a second query, not a join. */
 export async function getRecentExecutions(
   supabase: SupabaseClient<Database>,
   limit = 10,
@@ -56,10 +56,10 @@ export async function getRecentExecutions(
 
   if (!executions || executions.length === 0) return [];
 
-  const leadNames = await resolveLeadNames(supabase, executions);
+  const entityNames = await resolveEntityNames(supabase, executions);
 
   return executions.map((execution) => ({
     ...execution,
-    leadName: execution.entity_id ? (leadNames.get(execution.entity_id) ?? null) : null,
+    entityName: execution.entity_id ? (entityNames.get(execution.entity_id) ?? null) : null,
   }));
 }

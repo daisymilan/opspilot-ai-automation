@@ -30,7 +30,7 @@ export function RecentExecutionsTable({ executions }: { executions: RecentExecut
                     href={`/executions/${execution.id}`}
                     className="font-medium hover:underline"
                   >
-                    {execution.leadName ?? execution.entity_id ?? "—"}
+                    {execution.entityName ?? execution.entity_id ?? "—"}
                   </Link>
                 </td>
                 <td className="px-4 py-3 text-black/70 dark:text-white/70">

@@ -21,7 +21,8 @@ export default async function ExecutionDetailPage({ params }: { params: Promise<
   const detail = await getExecutionDetail(supabase, id);
   if (!detail) notFound();
 
-  const { execution, lead, score, approval, auditEvents, siblingExecutions } = detail;
+  const { execution, lead, score, document, extraction, approval, auditEvents, siblingExecutions } =
+    detail;
 
   return (
     <div className="flex flex-col gap-8 max-w-3xl">
@@ -35,7 +36,7 @@ export default async function ExecutionDetailPage({ params }: { params: Promise<
         <div className="flex items-start justify-between gap-4 mt-1">
           <div>
             <h1 className="text-2xl font-semibold">
-              {lead?.name ?? execution.entity_id ?? execution.workflow_name}
+              {lead?.name ?? document?.file_name ?? execution.entity_id ?? execution.workflow_name}
             </h1>
             <p className="text-sm text-black/60 dark:text-white/60">{execution.workflow_name}</p>
           </div>
@@ -78,6 +79,30 @@ export default async function ExecutionDetailPage({ params }: { params: Promise<
             <Badge>{score.recommended_action.replace(/_/g, " ")}</Badge>
           </div>
           <p className="text-sm text-black/70 dark:text-white/70">{score.reasoning_summary}</p>
+        </section>
+      ) : null}
+
+      {extraction ? (
+        <section className="rounded-lg border border-black/10 dark:border-white/10 p-5 flex flex-col gap-3">
+          <h2 className="text-sm font-medium">Document extraction</h2>
+          <div className="flex flex-wrap gap-2">
+            <Badge>confidence {(extraction.confidence * 100).toFixed(0)}%</Badge>
+            {extraction.amount != null ? (
+              <Badge>
+                {extraction.amount.toFixed(2)} {extraction.currency ?? ""}
+              </Badge>
+            ) : null}
+          </div>
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+            <dt className="text-black/50 dark:text-white/50">Vendor</dt>
+            <dd>{extraction.vendor_name ?? "—"}</dd>
+            <dt className="text-black/50 dark:text-white/50">Invoice number</dt>
+            <dd>{extraction.invoice_number ?? "—"}</dd>
+            <dt className="text-black/50 dark:text-white/50">Due date</dt>
+            <dd>{extraction.due_date ?? "—"}</dd>
+            <dt className="text-black/50 dark:text-white/50">Model</dt>
+            <dd className="font-mono text-xs">{extraction.model}</dd>
+          </dl>
         </section>
       ) : null}
 

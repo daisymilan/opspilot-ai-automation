@@ -1,13 +1,13 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
-import { resolveLeadNames } from "./leadNames";
+import { resolveEntityNames } from "./entityNames";
 import type { ExecutionStatus } from "./formatting";
 
 type ExecutionRow = Database["public"]["Tables"]["workflow_executions"]["Row"];
 
 export interface ExecutionListItem extends ExecutionRow {
-  leadName: string | null;
+  entityName: string | null;
 }
 
 export interface ExecutionListFilters {
@@ -48,12 +48,12 @@ export async function getExecutionsList(
   if (filters.to) query = query.lte("started_at", `${filters.to}T23:59:59.999`);
 
   const { data: executions, count } = await query;
-  const leadNames = await resolveLeadNames(supabase, executions ?? []);
+  const entityNames = await resolveEntityNames(supabase, executions ?? []);
 
   return {
     executions: (executions ?? []).map((execution) => ({
       ...execution,
-      leadName: execution.entity_id ? (leadNames.get(execution.entity_id) ?? null) : null,
+      entityName: execution.entity_id ? (entityNames.get(execution.entity_id) ?? null) : null,
     })),
     total: count ?? 0,
     page,

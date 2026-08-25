@@ -6,12 +6,19 @@ type ExecutionRow = Database["public"]["Tables"]["workflow_executions"]["Row"];
 type AuditLogRow = Database["public"]["Tables"]["audit_logs"]["Row"];
 type ApprovalRow = Database["public"]["Tables"]["approvals"]["Row"];
 type LeadScoreRow = Database["public"]["Tables"]["lead_scores"]["Row"];
+type DocumentExtractionRow = Database["public"]["Tables"]["document_extractions"]["Row"];
 
 export interface ExecutionDetailLead {
   id: string;
   name: string;
   company: string | null;
   email: string | null;
+}
+
+export interface ExecutionDetailDocument {
+  id: string;
+  file_name: string;
+  mime_type: string;
 }
 
 export interface ExecutionSibling {
@@ -25,6 +32,8 @@ export interface ExecutionDetail {
   execution: ExecutionRow;
   lead: ExecutionDetailLead | null;
   score: LeadScoreRow | null;
+  document: ExecutionDetailDocument | null;
+  extraction: DocumentExtractionRow | null;
   approval: ApprovalRow | null;
   auditEvents: AuditLogRow[];
   siblingExecutions: ExecutionSibling[];
@@ -50,6 +59,8 @@ export async function getExecutionDetail(
       execution,
       lead: null,
       score: null,
+      document: null,
+      extraction: null,
       approval: null,
       auditEvents: [],
       siblingExecutions: [],
@@ -81,6 +92,8 @@ export async function getExecutionDetail(
 
   let lead: ExecutionDetailLead | null = null;
   let score: LeadScoreRow | null = null;
+  let document: ExecutionDetailDocument | null = null;
+  let extraction: DocumentExtractionRow | null = null;
   if (entityType === "lead") {
     const [leadResult, scoreResult] = await Promise.all([
       supabase.from("leads").select("id, name, company, email").eq("id", entityId).maybeSingle(),
@@ -94,6 +107,19 @@ export async function getExecutionDetail(
     ]);
     lead = leadResult.data;
     score = scoreResult.data;
+  } else if (entityType === "document") {
+    const [documentResult, extractionResult] = await Promise.all([
+      supabase.from("documents").select("id, file_name, mime_type").eq("id", entityId).maybeSingle(),
+      supabase
+        .from("document_extractions")
+        .select("*")
+        .eq("document_id", entityId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
+    document = documentResult.data;
+    extraction = extractionResult.data;
   }
 
   // An entity can have multiple executions (retries), and most audit
@@ -113,6 +139,8 @@ export async function getExecutionDetail(
     execution,
     lead,
     score,
+    document,
+    extraction,
     approval: approvalResult.data ?? null,
     auditEvents,
     siblingExecutions: (siblingResult.data ?? []).filter((sibling) => sibling.id !== execution.id),

@@ -19,16 +19,32 @@ export interface ApprovalScoreContext {
   reasoning_summary: string;
 }
 
+export interface ApprovalDocumentContext {
+  id: string;
+  file_name: string;
+}
+
+export interface ApprovalExtractionContext {
+  vendor_name: string | null;
+  amount: number | null;
+  currency: string | null;
+  confidence: number;
+}
+
 export interface ApprovalWithContext extends ApprovalRow {
   lead: ApprovalLeadContext | null;
   score: ApprovalScoreContext | null;
+  document: ApprovalDocumentContext | null;
+  extraction: ApprovalExtractionContext | null;
 }
 
 /**
  * approvals references its entity polymorphically (entity_type/entity_id,
- * no FK — see Phase 1), so lead + latest lead_score context is resolved
+ * no FK — see Phase 1), so entity + latest AI-output context is resolved
  * with secondary queries, not a join, same pattern as
- * services/dashboard/getMetrics.ts's getRecentExecutions.
+ * services/dashboard/getMetrics.ts's getRecentExecutions. One vertical per
+ * entity_type value found among the approvals — a lead approval never pays
+ * for a document query and vice versa.
  */
 async function attachContext(
   supabase: SupabaseClient<Database>,
@@ -37,32 +53,62 @@ async function attachContext(
   const leadIds = approvals
     .filter((approval) => approval.entity_type === "lead")
     .map((approval) => approval.entity_id);
+  const documentIds = approvals
+    .filter((approval) => approval.entity_type === "document")
+    .map((approval) => approval.entity_id);
 
-  if (leadIds.length === 0) {
-    return approvals.map((approval) => ({ ...approval, lead: null, score: null }));
-  }
-
-  const [{ data: leads }, { data: scores }] = await Promise.all([
-    supabase.from("leads").select("id, name, company, email").in("id", leadIds),
-    supabase
-      .from("lead_scores")
-      .select("lead_id, score, priority, intent, confidence, reasoning_summary")
-      .in("lead_id", leadIds)
-      .order("created_at", { ascending: false }),
-  ]);
+  const [{ data: leads }, { data: scores }, { data: documents }, { data: extractions }] =
+    await Promise.all([
+      leadIds.length > 0
+        ? supabase.from("leads").select("id, name, company, email").in("id", leadIds)
+        : Promise.resolve({ data: [] as ApprovalLeadContext[] }),
+      leadIds.length > 0
+        ? supabase
+            .from("lead_scores")
+            .select("lead_id, score, priority, intent, confidence, reasoning_summary")
+            .in("lead_id", leadIds)
+            .order("created_at", { ascending: false })
+        : Promise.resolve({ data: [] as (ApprovalScoreContext & { lead_id: string })[] }),
+      documentIds.length > 0
+        ? supabase.from("documents").select("id, file_name").in("id", documentIds)
+        : Promise.resolve({ data: [] as ApprovalDocumentContext[] }),
+      documentIds.length > 0
+        ? supabase
+            .from("document_extractions")
+            .select("document_id, vendor_name, amount, currency, confidence, created_at")
+            .in("document_id", documentIds)
+            .order("created_at", { ascending: false })
+        : Promise.resolve({
+            data: [] as (ApprovalExtractionContext & { document_id: string })[],
+          }),
+    ]);
 
   const leadMap = new Map((leads ?? []).map((lead) => [lead.id, lead]));
-  // Rows arrive newest-first, so the first one seen per lead_id is the
-  // latest analysis — later duplicates for the same lead are ignored.
+  const documentMap = new Map((documents ?? []).map((document) => [document.id, document]));
+
+  // Rows arrive newest-first, so the first one seen per id is the latest
+  // analysis/extraction — later duplicates for the same entity are ignored.
   const scoreMap = new Map<string, ApprovalScoreContext>();
   for (const score of scores ?? []) {
     if (!scoreMap.has(score.lead_id)) scoreMap.set(score.lead_id, score);
+  }
+  const extractionMap = new Map<string, ApprovalExtractionContext>();
+  for (const extraction of extractions ?? []) {
+    if (!extractionMap.has(extraction.document_id)) {
+      extractionMap.set(extraction.document_id, extraction);
+    }
   }
 
   return approvals.map((approval) => ({
     ...approval,
     lead: approval.entity_type === "lead" ? (leadMap.get(approval.entity_id) ?? null) : null,
     score: approval.entity_type === "lead" ? (scoreMap.get(approval.entity_id) ?? null) : null,
+    document:
+      approval.entity_type === "document" ? (documentMap.get(approval.entity_id) ?? null) : null,
+    extraction:
+      approval.entity_type === "document"
+        ? (extractionMap.get(approval.entity_id) ?? null)
+        : null,
   }));
 }
 
